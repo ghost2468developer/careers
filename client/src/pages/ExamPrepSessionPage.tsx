@@ -235,8 +235,16 @@ export const ExamPrepSessionPage: React.FC = () => {
           >
             {subjectMeta.label}
           </span>
-          <span className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-xs text-slate-300">
-            Term {paper.term} · {paper.year}
+          <span
+            className={`rounded-full border px-3 py-0.5 text-xs font-extrabold ${
+              paper.assessmentType === 'EXAM'
+                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+            }`}
+          >
+            {paper.assessmentType === 'EXAM'
+              ? 'PAST PAPER EXAM · 150 MARKS · 10 QUESTIONS'
+              : 'REVISION QUIZ · 100 MARKS · 10 QUESTIONS'}
           </span>
           <span className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-amber-300">
             Total: {paper.totalMarks} Marks ({paper.questions.length} Questions)
@@ -244,6 +252,11 @@ export const ExamPrepSessionPage: React.FC = () => {
         </div>
 
         <h1 className="mt-3 text-2xl font-extrabold text-white">{paper.title}</h1>
+        {paper.pastPaperSource && (
+          <p className="mt-1 text-xs font-semibold text-sky-300">
+            Source: {paper.pastPaperSource}
+          </p>
+        )}
         <p className="mt-1 text-xs text-slate-400">{paper.description}</p>
       </div>
 

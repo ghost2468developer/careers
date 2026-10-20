@@ -4,7 +4,6 @@ import {
   ShieldCheck,
   GraduationCap,
   LogOut,
-  Code2,
   BookOpenCheck,
   KeyRound,
   UserPlus,
@@ -37,7 +36,7 @@ export const Navbar: React.FC = () => {
                 Matric<span className="text-emerald-400">Prep</span>
               </span>
               <span className="hidden sm:inline-block ml-2 rounded-md border border-slate-800 bg-slate-900 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-                Grade 10–12 Exam Revision
+                Grade 10–12 Past Papers & Quizzes
               </span>
             </div>
           </Link>
@@ -54,7 +53,7 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   <BookOpenCheck className="h-4 w-4 text-emerald-400" />
-                  Learner Exam Prep (Grade {user.grade})
+                  Grade {user.grade} Exams & Quizzes
                 </Link>
 
                 {user.role === 'ADMIN' && (
@@ -67,23 +66,11 @@ export const Navbar: React.FC = () => {
                     }`}
                   >
                     <ShieldCheck className="h-4 w-4 text-indigo-400" />
-                    Admin Progress & Papers
+                    Admin Progress & Exam Creator
                   </Link>
                 )}
               </>
             )}
-
-            <Link
-              to="/architecture"
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                isActive('/architecture')
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-              }`}
-            >
-              <Code2 className="h-4 w-4 text-sky-400" />
-              API Modules & GraphQL
-            </Link>
           </nav>
         </div>
 
@@ -157,7 +144,7 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Navigation Bar */}
+      {/* Mobile Navigation Bar (No API Modules link for learners) */}
       {user && (
         <div className="flex md:hidden items-center justify-around border-t border-slate-900 bg-slate-950 px-2 py-2">
           <Link
@@ -167,7 +154,7 @@ export const Navbar: React.FC = () => {
             }`}
           >
             <BookOpenCheck className="h-3.5 w-3.5" />
-            Grade {user.grade} Prep
+            Grade {user.grade} Exams & Quizzes
           </Link>
           {user.role === 'ADMIN' && (
             <Link
@@ -180,15 +167,6 @@ export const Navbar: React.FC = () => {
               Admin Console
             </Link>
           )}
-          <Link
-            to="/architecture"
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium ${
-              isActive('/architecture') ? 'bg-slate-800 text-white' : 'text-slate-400'
-            }`}
-          >
-            <Code2 className="h-3.5 w-3.5" />
-            API Schema
-          </Link>
         </div>
       )}
     </header>

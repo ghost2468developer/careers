@@ -1,5 +1,5 @@
 import { GraphQLError } from 'graphql';
-import { SubjectCode } from '@prisma/client';
+import { AssessmentType, SubjectCode } from '@prisma/client';
 import { GraphQLContext } from '../../types/context';
 import { requireAuth } from '../../lib/auth';
 import { calculateAchievementLevel, gradeStudentAnswer } from '../../lib/grading';
@@ -28,6 +28,8 @@ export function serializeExamPaper(paper: any) {
   );
   return {
     ...paper,
+    assessmentType: paper.assessmentType || AssessmentType.EXAM,
+    pastPaperSource: paper.pastPaperSource || null,
     questionCount: questions.length,
     questions,
     createdAt:
@@ -72,6 +74,7 @@ export function serializeExamAttempt(attempt: any) {
     examPaperId: attempt.examPaperId,
     examPaperTitle: attempt.examPaper?.title ?? 'Exam Paper',
     subject: attempt.examPaper?.subject ?? SubjectCode.MATHEMATICS,
+    assessmentType: attempt.examPaper?.assessmentType ?? AssessmentType.EXAM,
     grade: attempt.examPaper?.grade ?? 10,
     mode: attempt.mode,
     scoreEarned: attempt.scoreEarned,
@@ -92,7 +95,11 @@ export const examResolvers = {
   Query: {
     examPapersForGrade: async (
       _parent: unknown,
-      args: { grade: number; subject?: SubjectCode | null },
+      args: {
+        grade: number;
+        subject?: SubjectCode | null;
+        assessmentType?: AssessmentType | null;
+      },
       context: GraphQLContext
     ) => {
       requireAuth(context);
@@ -108,11 +115,17 @@ export const examResolvers = {
           grade: args.grade,
           isPublished: true,
           ...(args.subject ? { subject: args.subject } : {}),
+          ...(args.assessmentType ? { assessmentType: args.assessmentType } : {}),
         },
         include: {
           questions: true,
         },
-        orderBy: [{ subject: 'asc' }, { term: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [
+          { assessmentType: 'asc' },
+          { subject: 'asc' },
+          { term: 'asc' },
+          { createdAt: 'desc' },
+        ],
       });
 
       return papers.map(serializeExamPaper);
@@ -136,7 +149,11 @@ export const examResolvers = {
 
     myExamAttempts: async (
       _parent: unknown,
-      args: { grade?: number | null; subject?: SubjectCode | null },
+      args: {
+        grade?: number | null;
+        subject?: SubjectCode | null;
+        assessmentType?: AssessmentType | null;
+      },
       context: GraphQLContext
     ) => {
       const user = requireAuth(context);
@@ -147,6 +164,7 @@ export const examResolvers = {
           examPaper: {
             ...(args.grade ? { grade: args.grade } : {}),
             ...(args.subject ? { subject: args.subject } : {}),
+            ...(args.assessmentType ? { assessmentType: args.assessmentType } : {}),
           },
         },
         include: {
@@ -229,9 +247,21 @@ export const examResolvers = {
           : 0;
 
       const distinctPaperIds = new Set(attemptsInGrade.map((a) => a.examPaperId));
+      const totalExamsInGrade = papersInGrade.filter(
+        (p) => p.assessmentType === AssessmentType.EXAM
+      ).length;
+      const totalQuizzesInGrade = papersInGrade.filter(
+        (p) => p.assessmentType === AssessmentType.QUIZ
+      ).length;
 
       const subjectSummaries = ALL_SUBJECTS.map((subj) => {
         const subjPapers = papersInGrade.filter((p) => p.subject === subj);
+        const subjExams = subjPapers.filter(
+          (p) => p.assessmentType === AssessmentType.EXAM
+        );
+        const subjQuizzes = subjPapers.filter(
+          (p) => p.assessmentType === AssessmentType.QUIZ
+        );
         const subjAttempts = attemptsInGrade.filter(
           (a) => a.examPaper.subject === subj
         );
@@ -263,6 +293,8 @@ export const examResolvers = {
           subject: subj,
           label: SUBJECT_LABELS[subj],
           grade: targetGrade,
+          examCount: subjExams.length,
+          quizCount: subjQuizzes.length,
           paperCount: subjPapers.length,
           questionCount,
           totalMarksAvailable,
@@ -279,11 +311,13 @@ export const examResolvers = {
         achievementLevel:
           totalAttempts > 0
             ? calculateAchievementLevel(averagePercentage)
-            : 'No attempts yet - Start an Exam Prep below!',
+            : 'No attempts yet - Choose a 150-Mark Past Paper Exam or 100-Mark Quiz below!',
         papersCompleted: distinctPaperIds.size,
         totalPapersInGrade: papersInGrade.length,
+        totalExamsInGrade,
+        totalQuizzesInGrade,
         subjectSummaries,
-        recentAttempts: attemptsInGrade.slice(0, 10).map(serializeExamAttempt),
+        recentAttempts: attemptsInGrade.slice(0, 12).map(serializeExamAttempt),
       };
     },
   },
@@ -377,7 +411,7 @@ export const examResolvers = {
         data: {
           userId: user.id,
           examPaperId: paper.id,
-          mode: args.input.mode || 'REVISION',
+          mode: args.input.mode || paper.assessmentType,
           scoreEarned,
           totalMarks,
           percentage,
@@ -399,7 +433,7 @@ export const examResolvers = {
       await context.prisma.auditLog.create({
         data: {
           action: 'EXAM_ATTEMPT_SUBMITTED',
-          details: `Learner ${user.name} (Grade ${paper.grade}) completed "${paper.title}" - Score: ${scoreEarned}/${totalMarks} (${percentage}%) [${gradeSymbol}]`,
+          details: `Learner ${user.name} (Grade ${paper.grade}) completed ${paper.assessmentType} "${paper.title}" - Score: ${scoreEarned}/${totalMarks} (${percentage}%) [${gradeSymbol}]`,
           userId: user.id,
         },
       });

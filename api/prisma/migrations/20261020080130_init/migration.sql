@@ -5,6 +5,9 @@ CREATE TYPE "Role" AS ENUM ('ADMIN', 'USER');
 CREATE TYPE "SubjectCode" AS ENUM ('MATHEMATICS', 'MATHEMATICAL_LITERACY', 'PHYSICAL_SCIENCES', 'LIFE_SCIENCES', 'GEOGRAPHY');
 
 -- CreateEnum
+CREATE TYPE "AssessmentType" AS ENUM ('EXAM', 'QUIZ');
+
+-- CreateEnum
 CREATE TYPE "QuestionType" AS ENUM ('MULTIPLE_CHOICE', 'TRUE_FALSE', 'NUMERIC', 'EXPLAIN');
 
 -- CreateTable
@@ -53,11 +56,13 @@ CREATE TABLE "ExamPaper" (
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "subject" "SubjectCode" NOT NULL,
+    "assessmentType" "AssessmentType" NOT NULL DEFAULT 'EXAM',
+    "pastPaperSource" TEXT,
     "grade" INTEGER NOT NULL,
     "term" INTEGER NOT NULL DEFAULT 1,
     "year" INTEGER NOT NULL DEFAULT 2026,
-    "durationMinutes" INTEGER NOT NULL DEFAULT 45,
-    "totalMarks" INTEGER NOT NULL DEFAULT 0,
+    "durationMinutes" INTEGER NOT NULL DEFAULT 120,
+    "totalMarks" INTEGER NOT NULL DEFAULT 150,
     "paperFileUrl" TEXT,
     "isPublished" BOOLEAN NOT NULL DEFAULT true,
     "createdById" TEXT,
@@ -79,7 +84,7 @@ CREATE TABLE "ExamQuestion" (
     "correctAnswer" TEXT NOT NULL,
     "rubricKeywords" TEXT[],
     "explanation" TEXT NOT NULL,
-    "marks" INTEGER NOT NULL DEFAULT 2,
+    "marks" INTEGER NOT NULL DEFAULT 15,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ExamQuestion_pkey" PRIMARY KEY ("id")
@@ -90,9 +95,9 @@ CREATE TABLE "ExamAttempt" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "examPaperId" TEXT NOT NULL,
-    "mode" TEXT NOT NULL DEFAULT 'REVISION',
+    "mode" TEXT NOT NULL DEFAULT 'EXAM',
     "scoreEarned" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "totalMarks" INTEGER NOT NULL DEFAULT 0,
+    "totalMarks" INTEGER NOT NULL DEFAULT 150,
     "percentage" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "gradeSymbol" TEXT NOT NULL DEFAULT 'Level 7 (Distinction)',
     "timeSpentSeconds" INTEGER NOT NULL DEFAULT 0,
@@ -109,7 +114,7 @@ CREATE TABLE "AttemptAnswer" (
     "questionId" TEXT NOT NULL,
     "studentAnswer" TEXT NOT NULL,
     "marksEarned" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "maxMarks" INTEGER NOT NULL DEFAULT 1,
+    "maxMarks" INTEGER NOT NULL DEFAULT 15,
     "isCorrect" BOOLEAN NOT NULL DEFAULT false,
     "isPartial" BOOLEAN NOT NULL DEFAULT false,
     "matchedKeywords" TEXT[],
@@ -153,7 +158,10 @@ CREATE INDEX "ExamPaper_grade_idx" ON "ExamPaper"("grade");
 CREATE INDEX "ExamPaper_subject_idx" ON "ExamPaper"("subject");
 
 -- CreateIndex
-CREATE INDEX "ExamPaper_grade_subject_idx" ON "ExamPaper"("grade", "subject");
+CREATE INDEX "ExamPaper_assessmentType_idx" ON "ExamPaper"("assessmentType");
+
+-- CreateIndex
+CREATE INDEX "ExamPaper_grade_subject_assessmentType_idx" ON "ExamPaper"("grade", "subject", "assessmentType");
 
 -- CreateIndex
 CREATE INDEX "ExamQuestion_examPaperId_idx" ON "ExamQuestion"("examPaperId");

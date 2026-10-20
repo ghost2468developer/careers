@@ -8,6 +8,8 @@ export const adminTypeDefs = `#graphql
     activeResetTokens: Int!
     totalAuditEvents: Int!
     totalExamPapers: Int!
+    totalExams150: Int!
+    totalQuizzes100: Int!
     totalQuestions: Int!
     totalExamAttempts: Int!
     overallAveragePercentage: Float!
@@ -63,6 +65,8 @@ export const adminTypeDefs = `#graphql
     title: String!
     description: String!
     subject: SubjectCode!
+    assessmentType: AssessmentType
+    pastPaperSource: String
     grade: Int!
     term: Int!
     year: Int!
@@ -76,7 +80,11 @@ export const adminTypeDefs = `#graphql
     adminUsers(search: String, role: Role, grade: Int, isActive: Boolean): [User!]!
     adminUser(id: ID!): User
     adminLearnerProgressList(grade: Int, search: String): [AdminLearnerProgress!]!
-    adminAllExamPapers(grade: Int, subject: SubjectCode): [ExamPaper!]!
+    adminAllExamPapers(
+      grade: Int
+      subject: SubjectCode
+      assessmentType: AssessmentType
+    ): [ExamPaper!]!
     adminAllExamAttempts(grade: Int, subject: SubjectCode, userId: ID): [ExamAttempt!]!
     adminResetTokens: [PasswordResetTokenInfo!]!
     adminAuditLogs(limit: Int): [AuditLog!]!

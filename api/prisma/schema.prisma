@@ -20,6 +20,11 @@ enum SubjectCode {
   GEOGRAPHY
 }
 
+enum AssessmentType {
+  EXAM
+  QUIZ
+}
+
 enum QuestionType {
   MULTIPLE_CHOICE
   TRUE_FALSE
@@ -79,11 +84,13 @@ model ExamPaper {
   title           String
   description     String
   subject         SubjectCode
+  assessmentType  AssessmentType @default(EXAM)
+  pastPaperSource String?
   grade           Int
   term            Int            @default(1)
   year            Int            @default(2026)
-  durationMinutes Int            @default(45)
-  totalMarks      Int            @default(0)
+  durationMinutes Int            @default(120)
+  totalMarks      Int            @default(150)
   paperFileUrl    String?
   isPublished     Boolean        @default(true)
   createdById     String?
@@ -95,7 +102,8 @@ model ExamPaper {
 
   @@index([grade])
   @@index([subject])
-  @@index([grade, subject])
+  @@index([assessmentType])
+  @@index([grade, subject, assessmentType])
 }
 
 model ExamQuestion {
@@ -110,7 +118,7 @@ model ExamQuestion {
   correctAnswer  String
   rubricKeywords String[]
   explanation    String
-  marks          Int             @default(2)
+  marks          Int             @default(15)
   createdAt      DateTime        @default(now())
   attemptAnswers AttemptAnswer[]
 
@@ -123,9 +131,9 @@ model ExamAttempt {
   user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   examPaperId      String
   examPaper        ExamPaper       @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
-  mode             String          @default("REVISION")
+  mode             String          @default("EXAM")
   scoreEarned      Float           @default(0)
-  totalMarks       Int             @default(0)
+  totalMarks       Int             @default(150)
   percentage       Float           @default(0)
   gradeSymbol      String          @default("Level 7 (Distinction)")
   timeSpentSeconds Int             @default(0)
@@ -145,7 +153,7 @@ model AttemptAnswer {
   question        ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   studentAnswer   String
   marksEarned     Float        @default(0)
-  maxMarks        Int          @default(1)
+  maxMarks        Int          @default(15)
   isCorrect       Boolean      @default(false)
   isPartial       Boolean      @default(false)
   matchedKeywords String[]

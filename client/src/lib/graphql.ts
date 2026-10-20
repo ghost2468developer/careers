@@ -7,6 +7,8 @@ export type SubjectCode =
   | 'LIFE_SCIENCES'
   | 'GEOGRAPHY';
 
+export type AssessmentType = 'EXAM' | 'QUIZ';
+
 export type QuestionType =
   | 'MULTIPLE_CHOICE'
   | 'TRUE_FALSE'
@@ -117,6 +119,8 @@ export interface ExamPaper {
   title: string;
   description: string;
   subject: SubjectCode;
+  assessmentType: AssessmentType;
+  pastPaperSource?: string | null;
   grade: number;
   term: number;
   year: number;
@@ -158,6 +162,7 @@ export interface ExamAttempt {
   examPaperId: string;
   examPaperTitle: string;
   subject: SubjectCode;
+  assessmentType: AssessmentType;
   grade: number;
   mode: string;
   scoreEarned: number;
@@ -174,6 +179,8 @@ export interface SubjectSummary {
   subject: SubjectCode;
   label: string;
   grade: number;
+  examCount: number;
+  quizCount: number;
   paperCount: number;
   questionCount: number;
   totalMarksAvailable: number;
@@ -189,6 +196,8 @@ export interface LearnerProgressSummary {
   achievementLevel: string;
   papersCompleted: number;
   totalPapersInGrade: number;
+  totalExamsInGrade: number;
+  totalQuizzesInGrade: number;
   subjectSummaries: SubjectSummary[];
   recentAttempts: ExamAttempt[];
 }
@@ -215,6 +224,8 @@ export interface AdminStats {
   activeResetTokens: number;
   totalAuditEvents: number;
   totalExamPapers: number;
+  totalExams150: number;
+  totalQuizzes100: number;
   totalQuestions: number;
   totalExamAttempts: number;
   overallAveragePercentage: number;
@@ -301,6 +312,7 @@ const EXAM_ATTEMPT_FIELDS = `#graphql
   examPaperId
   examPaperTitle
   subject
+  assessmentType
   grade
   mode
   scoreEarned
@@ -336,6 +348,8 @@ const EXAM_PAPER_FIELDS = `#graphql
   title
   description
   subject
+  assessmentType
+  pastPaperSource
   grade
   term
   year
@@ -523,8 +537,8 @@ export const USER_OPERATIONS = {
 
 export const EXAM_OPERATIONS = {
   LEARNER_GRADE_PORTAL: `#graphql
-    query LearnerGradePortal($grade: Int!, $subject: SubjectCode) {
-      examPapersForGrade(grade: $grade, subject: $subject) {
+    query LearnerGradePortal($grade: Int!, $subject: SubjectCode, $assessmentType: AssessmentType) {
+      examPapersForGrade(grade: $grade, subject: $subject, assessmentType: $assessmentType) {
         ${EXAM_PAPER_FIELDS}
       }
       myAcademicProgress(grade: $grade) {
@@ -534,10 +548,14 @@ export const EXAM_OPERATIONS = {
         achievementLevel
         papersCompleted
         totalPapersInGrade
+        totalExamsInGrade
+        totalQuizzesInGrade
         subjectSummaries {
           subject
           label
           grade
+          examCount
+          quizCount
           paperCount
           questionCount
           totalMarksAvailable
@@ -595,6 +613,8 @@ export const ADMIN_OPERATIONS = {
         activeResetTokens
         totalAuditEvents
         totalExamPapers
+        totalExams150
+        totalQuizzes100
         totalQuestions
         totalExamAttempts
         overallAveragePercentage

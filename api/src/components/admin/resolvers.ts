@@ -1,5 +1,12 @@
 import { GraphQLError } from 'graphql';
-import { Prisma, QuestionType, Role, SubjectCode, User } from '@prisma/client';
+import {
+  AssessmentType,
+  Prisma,
+  QuestionType,
+  Role,
+  SubjectCode,
+  User,
+} from '@prisma/client';
 import { GraphQLContext } from '../../types/context';
 import {
   generateResetTokenString,
@@ -36,6 +43,8 @@ export const adminResolvers = {
         activeResetTokens,
         totalAuditEvents,
         totalExamPapers,
+        totalExams150,
+        totalQuizzes100,
         totalQuestions,
         attempts,
         grade10Learners,
@@ -55,6 +64,12 @@ export const adminResolvers = {
         }),
         context.prisma.auditLog.count(),
         context.prisma.examPaper.count(),
+        context.prisma.examPaper.count({
+          where: { assessmentType: AssessmentType.EXAM },
+        }),
+        context.prisma.examPaper.count({
+          where: { assessmentType: AssessmentType.QUIZ },
+        }),
         context.prisma.examQuestion.count(),
         context.prisma.examAttempt.findMany({ select: { percentage: true } }),
         context.prisma.user.count({ where: { role: Role.USER, grade: 10 } }),
@@ -80,6 +95,8 @@ export const adminResolvers = {
         activeResetTokens,
         totalAuditEvents,
         totalExamPapers,
+        totalExams150,
+        totalQuizzes100,
         totalQuestions,
         totalExamAttempts,
         overallAveragePercentage,
@@ -197,7 +214,6 @@ export const adminResolvers = {
             ? Math.round(Math.max(...attempts.map((a) => a.percentage)) * 10) / 10
             : 0;
 
-        // Calculate strongest & weakest subject for this learner
         const bySubject = new Map<SubjectCode, number[]>();
         for (const att of attempts) {
           const subj = att.examPaper.subject;
@@ -243,7 +259,11 @@ export const adminResolvers = {
 
     adminAllExamPapers: async (
       _parent: unknown,
-      args: { grade?: number | null; subject?: SubjectCode | null },
+      args: {
+        grade?: number | null;
+        subject?: SubjectCode | null;
+        assessmentType?: AssessmentType | null;
+      },
       context: GraphQLContext
     ) => {
       requireAdmin(context);
@@ -252,11 +272,17 @@ export const adminResolvers = {
         where: {
           ...(args.grade ? { grade: args.grade } : {}),
           ...(args.subject ? { subject: args.subject } : {}),
+          ...(args.assessmentType ? { assessmentType: args.assessmentType } : {}),
         },
         include: {
           questions: true,
         },
-        orderBy: [{ grade: 'asc' }, { subject: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [
+          { grade: 'asc' },
+          { assessmentType: 'asc' },
+          { subject: 'asc' },
+          { createdAt: 'desc' },
+        ],
       });
 
       return papers.map(serializeExamPaper);
@@ -609,6 +635,8 @@ export const adminResolvers = {
           title: string;
           description: string;
           subject: SubjectCode;
+          assessmentType?: AssessmentType | null;
+          pastPaperSource?: string | null;
           grade: number;
           term: number;
           year: number;
@@ -637,8 +665,10 @@ export const adminResolvers = {
         });
       }
 
+      const assessmentType = args.input.assessmentType || AssessmentType.EXAM;
+
       if (!args.input.questions || args.input.questions.length === 0) {
-        throw new GraphQLError('An exam paper must contain at least 1 question.', {
+        throw new GraphQLError('An assessment must contain questions.', {
           extensions: { code: 'BAD_USER_INPUT' },
         });
       }
@@ -648,15 +678,45 @@ export const adminResolvers = {
         0
       );
 
+      if (assessmentType === AssessmentType.EXAM) {
+        if (args.input.questions.length !== 10) {
+          throw new GraphQLError(
+            `An Exam must have exactly 10 questions (currently ${args.input.questions.length}).`,
+            { extensions: { code: 'BAD_USER_INPUT' } }
+          );
+        }
+        if (totalMarks !== 150) {
+          throw new GraphQLError(
+            `An Exam must total exactly 150 marks across its 10 questions (currently ${totalMarks} marks).`,
+            { extensions: { code: 'BAD_USER_INPUT' } }
+          );
+        }
+      } else if (assessmentType === AssessmentType.QUIZ) {
+        if (totalMarks !== 100) {
+          throw new GraphQLError(
+            `A Quiz must total exactly 100 marks (currently ${totalMarks} marks).`,
+            { extensions: { code: 'BAD_USER_INPUT' } }
+          );
+        }
+      }
+
       const createdPaper = await context.prisma.examPaper.create({
         data: {
           title: args.input.title.trim(),
           description: args.input.description.trim(),
           subject: args.input.subject,
+          assessmentType,
+          pastPaperSource:
+            args.input.pastPaperSource?.trim() ||
+            (assessmentType === AssessmentType.EXAM
+              ? `DBE NSC Grade ${args.input.grade} Past Paper`
+              : `Grade ${args.input.grade} Topic Revision Quiz`),
           grade: args.input.grade,
           term: args.input.term || 1,
           year: args.input.year || 2026,
-          durationMinutes: args.input.durationMinutes || 45,
+          durationMinutes:
+            args.input.durationMinutes ||
+            (assessmentType === AssessmentType.EXAM ? 150 : 60),
           totalMarks,
           paperFileUrl: args.input.paperFileUrl || null,
           isPublished: true,
@@ -671,7 +731,7 @@ export const adminResolvers = {
               correctAnswer: q.correctAnswer.trim(),
               rubricKeywords: q.rubricKeywords || [],
               explanation: q.explanation.trim(),
-              marks: q.marks || 2,
+              marks: q.marks || (assessmentType === AssessmentType.EXAM ? 15 : 10),
             })),
           },
         },
@@ -682,10 +742,13 @@ export const adminResolvers = {
 
       await context.prisma.auditLog.create({
         data: {
-          action: 'EXAM_PAPER_CREATED',
+          action:
+            assessmentType === AssessmentType.EXAM
+              ? 'EXAM_150_CREATED'
+              : 'QUIZ_100_CREATED',
           details: `Admin ${adminUser.email} published Grade ${createdPaper.grade} ${
             SUBJECT_LABELS[createdPaper.subject]
-          } paper: "${createdPaper.title}" (${createdPaper.questions.length} questions, ${totalMarks} marks)`,
+          } ${assessmentType}: "${createdPaper.title}" (${createdPaper.questions.length} questions, ${totalMarks} marks)`,
           userId: adminUser.id,
         },
       });
@@ -717,7 +780,7 @@ export const adminResolvers = {
       await context.prisma.auditLog.create({
         data: {
           action: 'EXAM_PAPER_DELETED',
-          details: `Admin ${adminUser.email} deleted Grade ${existing.grade} exam paper "${existing.title}"`,
+          details: `Admin ${adminUser.email} deleted Grade ${existing.grade} ${existing.assessmentType} "${existing.title}"`,
           userId: adminUser.id,
         },
       });

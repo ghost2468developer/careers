@@ -12,12 +12,14 @@ import {
   Sparkles,
   Play,
   FileText,
+  Zap,
   User as UserIcon,
   Lock,
   Eye,
   X,
 } from 'lucide-react';
 import {
+  AssessmentType,
   EXAM_OPERATIONS,
   ExamAttempt,
   ExamPaper,
@@ -37,17 +39,17 @@ export const UserDashboardPage: React.FC = () => {
 
   const [activeGrade, setActiveGrade] = useState<number>(user?.grade || 10);
   const [selectedSubject, setSelectedSubject] = useState<'ALL' | SubjectCode>('ALL');
-  const [activeTab, setActiveTab] = useState<'papers' | 'history' | 'profile'>('papers');
+  const [activeTab, setActiveTab] = useState<'EXAM' | 'QUIZ' | 'history' | 'profile'>(
+    'EXAM'
+  );
 
   const [papers, setPapers] = useState<ExamPaper[]>([]);
   const [progress, setProgress] = useState<LearnerProgressSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [switchingGrade, setSwitchingGrade] = useState(false);
 
-  // Selected past attempt modal for inspecting graded script
   const [inspectedAttempt, setInspectedAttempt] = useState<ExamAttempt | null>(null);
 
-  // Profile & Password state
   const [name, setName] = useState(user?.name || '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
@@ -63,7 +65,11 @@ export const UserDashboardPage: React.FC = () => {
   } | null>(null);
 
   const loadGradePortal = useCallback(
-    async (gradeToLoad: number, subjectFilter: 'ALL' | SubjectCode) => {
+    async (
+      gradeToLoad: number,
+      subjectFilter: 'ALL' | SubjectCode,
+      assessmentFilter?: AssessmentType
+    ) => {
       setLoading(true);
       try {
         const data = await graphqlRequest<{
@@ -72,6 +78,7 @@ export const UserDashboardPage: React.FC = () => {
         }>(EXAM_OPERATIONS.LEARNER_GRADE_PORTAL, {
           grade: gradeToLoad,
           subject: subjectFilter === 'ALL' ? null : subjectFilter,
+          assessmentType: assessmentFilter || null,
         });
 
         setPapers(data.examPapersForGrade);
@@ -86,8 +93,10 @@ export const UserDashboardPage: React.FC = () => {
   );
 
   useEffect(() => {
-    loadGradePortal(activeGrade, selectedSubject);
-  }, [activeGrade, selectedSubject, loadGradePortal]);
+    const assessmentFilter: AssessmentType | undefined =
+      activeTab === 'EXAM' ? 'EXAM' : activeTab === 'QUIZ' ? 'QUIZ' : undefined;
+    loadGradePortal(activeGrade, selectedSubject, assessmentFilter);
+  }, [activeGrade, selectedSubject, activeTab, loadGradePortal]);
 
   const handleSelectGrade = async (newGrade: number) => {
     if (newGrade === activeGrade) return;
@@ -166,7 +175,7 @@ export const UserDashboardPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-0.5 text-xs font-bold text-emerald-300">
                 <GraduationCap className="h-3.5 w-3.5" />
-                GRADE {activeGrade} REVISION & EXAM PREP PORTAL
+                GRADE {activeGrade} PAST PAPER EXAMS (150 MARKS) & QUIZZES (100 MARKS)
               </span>
               {user?.role === 'ADMIN' && (
                 <Link
@@ -183,10 +192,15 @@ export const UserDashboardPage: React.FC = () => {
               Welcome, {user?.name} - Showing Grade {activeGrade} Only
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 max-w-2xl">
-              Select your grade level below. Choosing{' '}
-              <strong className="text-white">Grade {activeGrade}</strong> filters all subjects,
-              exam prep papers, marking rubrics, and progress metrics strictly to{' '}
-              <strong className="text-emerald-300">Grade {activeGrade}</strong>.
+              Choose between the{' '}
+              <strong className="text-indigo-300">
+                Past Paper Exam Side (150 Marks · 10 Questions)
+              </strong>{' '}
+              and the{' '}
+              <strong className="text-emerald-300">
+                Revision Quiz Side (100 Marks · 10 Questions)
+              </strong>{' '}
+              filtered strictly to <strong className="text-white">Grade {activeGrade}</strong>.
             </p>
           </div>
 
@@ -216,7 +230,7 @@ export const UserDashboardPage: React.FC = () => {
                         isSelected ? 'text-emerald-100' : 'text-slate-500'
                       }`}
                     >
-                      {g === 12 ? 'Matric NSC' : `Only Gr ${g}`}
+                      {g === 12 ? 'Only Gr 12' : `Only Gr ${g}`}
                     </span>
                   </button>
                 );
@@ -227,14 +241,24 @@ export const UserDashboardPage: React.FC = () => {
 
         {/* Grade KPI Summary Row */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-slate-800/80 pt-5">
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
-            <p className="text-[11px] text-slate-400">Grade {activeGrade} Exam Papers</p>
+          <div className="rounded-xl border border-indigo-500/25 bg-indigo-950/20 p-3.5">
+            <p className="text-[11px] text-indigo-300 font-semibold">
+              Grade {activeGrade} Past Paper Exams
+            </p>
             <p className="mt-1 text-xl font-extrabold text-white">
-              {progress?.totalPapersInGrade ?? 5} Papers
+              {progress?.totalExamsInGrade ?? 5} Exams (150 Marks)
             </p>
-            <p className="text-[11px] text-emerald-400">
-              {progress?.papersCompleted ?? 0} completed by you
+            <p className="text-[11px] text-slate-400">10 Past-Paper Questions each</p>
+          </div>
+
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-3.5">
+            <p className="text-[11px] text-emerald-300 font-semibold">
+              Grade {activeGrade} Revision Quizzes
             </p>
+            <p className="mt-1 text-xl font-extrabold text-white">
+              {progress?.totalQuizzesInGrade ?? 5} Quizzes (100 Marks)
+            </p>
+            <p className="text-[11px] text-slate-400">10 Quiz Questions each</p>
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
@@ -247,15 +271,13 @@ export const UserDashboardPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5 sm:col-span-2">
-            <p className="text-[11px] text-slate-400">
-              CAPS Achievement Rating (Grade {activeGrade})
-            </p>
-            <p className="mt-1 text-base sm:text-lg font-extrabold text-amber-300 truncate">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
+            <p className="text-[11px] text-slate-400">CAPS Achievement Level</p>
+            <p className="mt-1 text-sm font-extrabold text-amber-300 truncate">
               {progress?.achievementLevel || 'Ready to start'}
             </p>
             <p className="text-[11px] text-slate-400">
-              Auto-graded across Multiple Choice, Calculations & Rubric Explain questions
+              {progress?.papersCompleted ?? 0} papers completed
             </p>
           </div>
         </div>
@@ -268,7 +290,7 @@ export const UserDashboardPage: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-emerald-400" />
-            Grade {activeGrade} Subjects (Filter by Subject)
+            Grade {activeGrade} Subjects (Mathematics, Maths Literacy, Physical Sciences, Life Sciences, Geography)
           </h2>
           {selectedSubject !== 'ALL' && (
             <button
@@ -296,11 +318,11 @@ export const UserDashboardPage: React.FC = () => {
                 All Subjects
               </span>
               <p className="mt-1 text-sm font-bold text-white">
-                Grade {activeGrade} Bundle
+                Grade {activeGrade} Complete
               </p>
             </div>
             <p className="mt-3 text-[11px] text-slate-400">
-              {progress?.totalPapersInGrade ?? 5} Exam Preps
+              {progress?.totalExamsInGrade ?? 5} Exams · {progress?.totalQuizzesInGrade ?? 5} Quizzes
             </p>
           </button>
 
@@ -329,13 +351,13 @@ export const UserDashboardPage: React.FC = () => {
                   </p>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>{subj.questionCount} Qs</span>
-                  {subj.attemptsCount > 0 ? (
+                  <span>
+                    {subj.examCount} Exam · {subj.quizCount} Quiz
+                  </span>
+                  {subj.attemptsCount > 0 && (
                     <span className="font-bold text-emerald-300">
-                      Best: {subj.bestPercentage}%
+                      {subj.bestPercentage}%
                     </span>
-                  ) : (
-                    <span>{subj.totalMarksAvailable} Marks</span>
                   )}
                 </div>
               </button>
@@ -344,27 +366,42 @@ export const UserDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+      {/* =================================================================== */}
+      {/* SIDE SWITCHER: EXAM SIDE (150 MARKS) vs QUIZ SIDE (100 MARKS)       */}
+      {/* =================================================================== */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
         <button
           type="button"
-          onClick={() => setActiveTab('papers')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-            activeTab === 'papers'
-              ? 'bg-emerald-600 text-white'
+          onClick={() => setActiveTab('EXAM')}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+            activeTab === 'EXAM'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
               : 'bg-slate-900 text-slate-400 hover:text-white'
           }`}
         >
           <FileText className="h-4 w-4" />
-          Grade {activeGrade} Exam Prep Papers ({papers.length})
+          Past Paper Exams Side (150 Marks · 10 Questions)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('QUIZ')}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+            activeTab === 'QUIZ'
+              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
+              : 'bg-slate-900 text-slate-400 hover:text-white'
+          }`}
+        >
+          <Zap className="h-4 w-4" />
+          Revision Quiz Side (100 Marks · 10 Questions)
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('history')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
             activeTab === 'history'
-              ? 'bg-emerald-600 text-white'
+              ? 'bg-amber-600 text-white'
               : 'bg-slate-900 text-slate-400 hover:text-white'
           }`}
         >
@@ -376,33 +413,67 @@ export const UserDashboardPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('profile')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
             activeTab === 'profile'
-              ? 'bg-emerald-600 text-white'
+              ? 'bg-slate-800 text-white'
               : 'bg-slate-900 text-slate-400 hover:text-white'
           }`}
         >
           <UserIcon className="h-4 w-4" />
-          Learner Profile & Password
+          Learner Profile
         </button>
       </div>
 
       {/* =================================================================== */}
-      {/* TAB 1: GRADE EXAM PREP PAPERS                                       */}
+      {/* TAB 1 & 2: EXAM SIDE (150 MARKS · 10 Qs) OR QUIZ SIDE (100 MARKS)   */}
       {/* =================================================================== */}
-      {activeTab === 'papers' && (
-        <div>
+      {(activeTab === 'EXAM' || activeTab === 'QUIZ') && (
+        <div className="space-y-4">
+          <div
+            className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+              activeTab === 'EXAM'
+                ? 'border-indigo-500/30 bg-indigo-950/20'
+                : 'border-emerald-500/30 bg-emerald-950/20'
+            }`}
+          >
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                {activeTab === 'EXAM'
+                  ? `Grade ${activeGrade} National Past Paper Examinations - 150 Marks · 10 Questions Each`
+                  : `Grade ${activeGrade} Topic Mastery Quizzes - 100 Marks · 10 Questions Each`}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {activeTab === 'EXAM'
+                  ? 'Full 150-mark past paper exams with 10 structured questions (15 marks per question) covering Multiple Choice, Calculations, True/False, and Rubric Explain questions.'
+                  : '100-mark interactive quizzes (10 marks per question) designed for rapid topic revision and instant step-by-step explanations.'}
+              </p>
+            </div>
+            <span
+              className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-extrabold ${
+                activeTab === 'EXAM'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-emerald-600 text-white'
+              }`}
+            >
+              {activeTab === 'EXAM'
+                ? '150 MARKS · 10 QUESTIONS'
+                : '100 MARKS · 10 QUESTIONS'}
+            </span>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
               <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
               <span className="text-sm">
-                Loading Grade {activeGrade} Exam Prep Papers...
+                Loading Grade {activeGrade}{' '}
+                {activeTab === 'EXAM' ? '150-Mark Past Paper Exams' : '100-Mark Quizzes'}...
               </span>
             </div>
           ) : papers.length === 0 ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center">
               <p className="text-sm text-slate-400">
-                No exam papers found for Grade {activeGrade} in this subject filter.
+                No {activeTab === 'EXAM' ? '150-mark exams' : '100-mark quizzes'} found for
+                Grade {activeGrade} in this subject filter.
               </p>
             </div>
           ) : (
@@ -424,7 +495,7 @@ export const UserDashboardPage: React.FC = () => {
                   >
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-lg bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 text-xs font-extrabold text-emerald-300">
                             Grade {paper.grade}
                           </span>
@@ -433,16 +504,34 @@ export const UserDashboardPage: React.FC = () => {
                           >
                             {meta.label}
                           </span>
+                          <span
+                            className={`rounded-lg px-2.5 py-0.5 text-xs font-extrabold ${
+                              paper.assessmentType === 'EXAM'
+                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            }`}
+                          >
+                            {paper.assessmentType === 'EXAM'
+                              ? 'EXAM · 150 MARKS'
+                              : 'QUIZ · 100 MARKS'}
+                          </span>
                         </div>
-                        <span className="flex items-center gap-1 text-xs font-medium text-slate-400">
-                          <Clock className="h-3.5 w-3.5 text-amber-400" />
-                          {paper.durationMinutes} mins · {paper.totalMarks} Marks
+                        <span className="flex items-center gap-1 text-xs font-semibold text-amber-300">
+                          <Clock className="h-3.5 w-3.5" />
+                          {paper.questionCount} Qs · {paper.totalMarks} Marks
                         </span>
                       </div>
 
                       <h3 className="text-lg font-bold text-white leading-snug">
                         {paper.title}
                       </h3>
+
+                      {paper.pastPaperSource && (
+                        <p className="text-[11px] font-medium text-sky-300">
+                          Source: {paper.pastPaperSource}
+                        </p>
+                      )}
+
                       <p className="text-xs leading-relaxed text-slate-400">
                         {paper.description}
                       </p>
@@ -450,8 +539,8 @@ export const UserDashboardPage: React.FC = () => {
                       {/* Question Type Variety Badges */}
                       <div className="pt-1">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                          Question Variety & Grading Breakdown ({paper.questionCount}{' '}
-                          Questions):
+                          Question Breakdown ({paper.questionCount} Questions ={' '}
+                          {paper.totalMarks} Marks):
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {Object.entries(typeCounts).map(([qType, count]) => (
@@ -474,7 +563,7 @@ export const UserDashboardPage: React.FC = () => {
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
-                        Practice & Explain Mode
+                        Practice & Explain ({paper.totalMarks}m)
                       </button>
 
                       <button
@@ -483,7 +572,7 @@ export const UserDashboardPage: React.FC = () => {
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/15 px-3.5 py-2.5 text-xs font-bold text-indigo-300 transition hover:bg-indigo-500/25"
                       >
                         <Play className="h-3.5 w-3.5" />
-                        Timed Exam Mode
+                        Timed {paper.assessmentType === 'EXAM' ? 'Exam (150m)' : 'Quiz (100m)'}
                       </button>
                     </div>
                   </div>
@@ -495,21 +584,21 @@ export const UserDashboardPage: React.FC = () => {
       )}
 
       {/* =================================================================== */}
-      {/* TAB 2: MY GRADED ATTEMPTS & TEACHER FEEDBACK                        */}
+      {/* TAB 3: MY GRADED ATTEMPTS & TEACHER FEEDBACK                        */}
       {/* =================================================================== */}
       {activeTab === 'history' && (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
           {!progress || progress.recentAttempts.length === 0 ? (
             <div className="p-12 text-center space-y-3">
               <p className="text-sm text-slate-400">
-                You haven&apos;t completed any Grade {activeGrade} exam preps yet.
+                You haven&apos;t completed any Grade {activeGrade} exams or quizzes yet.
               </p>
               <button
                 type="button"
-                onClick={() => setActiveTab('papers')}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
+                onClick={() => setActiveTab('EXAM')}
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
               >
-                Browse Grade {activeGrade} Exam Papers
+                Browse Grade {activeGrade} 150-Mark Past Paper Exams
               </button>
             </div>
           ) : (
@@ -517,12 +606,13 @@ export const UserDashboardPage: React.FC = () => {
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-800 bg-slate-950/60 text-[11px] uppercase tracking-wider text-slate-400">
                   <tr>
-                    <th className="px-4 py-3.5">Exam Paper</th>
+                    <th className="px-4 py-3.5">Assessment</th>
+                    <th className="px-4 py-3.5">Type</th>
                     <th className="px-4 py-3.5">Subject</th>
                     <th className="px-4 py-3.5">Score & Percentage</th>
                     <th className="px-4 py-3.5">CAPS Achievement</th>
-                    <th className="px-4 py-3.5">Teacher / Admin Feedback</th>
-                    <th className="px-4 py-3.5 text-right">Review Script</th>
+                    <th className="px-4 py-3.5">Teacher Feedback</th>
+                    <th className="px-4 py-3.5 text-right">Review Memo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/70">
@@ -533,9 +623,19 @@ export const UserDashboardPage: React.FC = () => {
                         <td className="px-4 py-3.5">
                           <div className="font-bold text-white">{att.examPaperTitle}</div>
                           <div className="text-[11px] text-slate-400">
-                            Grade {att.grade} · {att.mode} Mode ·{' '}
-                            {new Date(att.completedAt).toLocaleString()}
+                            Grade {att.grade} · {new Date(att.completedAt).toLocaleString()}
                           </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                              att.assessmentType === 'EXAM'
+                                ? 'bg-indigo-500/20 text-indigo-300'
+                                : 'bg-emerald-500/20 text-emerald-300'
+                            }`}
+                          >
+                            {att.assessmentType} ({att.totalMarks}m)
+                          </span>
                         </td>
                         <td className="px-4 py-3.5">
                           <span
@@ -582,7 +682,7 @@ export const UserDashboardPage: React.FC = () => {
       )}
 
       {/* =================================================================== */}
-      {/* TAB 3: LEARNER PROFILE & PASSWORD SETTINGS                          */}
+      {/* TAB 4: LEARNER PROFILE & PASSWORD SETTINGS                          */}
       {/* =================================================================== */}
       {activeTab === 'profile' && (
         <div className="grid gap-6 md:grid-cols-2">
@@ -720,8 +820,9 @@ export const UserDashboardPage: React.FC = () => {
             <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
               <div>
                 <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
-                  Grade {inspectedAttempt.grade} · {inspectedAttempt.percentage}% (
-                  {inspectedAttempt.scoreEarned}/{inspectedAttempt.totalMarks} Marks)
+                  Grade {inspectedAttempt.grade} · {inspectedAttempt.assessmentType} ·{' '}
+                  {inspectedAttempt.percentage}% ({inspectedAttempt.scoreEarned}/
+                  {inspectedAttempt.totalMarks} Marks)
                 </span>
                 <h3 className="mt-1 text-lg font-bold text-white">
                   {inspectedAttempt.examPaperTitle}

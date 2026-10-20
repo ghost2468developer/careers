@@ -56,7 +56,14 @@ export const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/architecture" element={<ArchitecturePage />} />
+              <Route
+                path="/architecture"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <ArchitecturePage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

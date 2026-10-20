@@ -7,6 +7,11 @@ export const examTypeDefs = `#graphql
     GEOGRAPHY
   }
 
+  enum AssessmentType {
+    EXAM
+    QUIZ
+  }
+
   enum QuestionType {
     MULTIPLE_CHOICE
     TRUE_FALSE
@@ -33,6 +38,8 @@ export const examTypeDefs = `#graphql
     title: String!
     description: String!
     subject: SubjectCode!
+    assessmentType: AssessmentType!
+    pastPaperSource: String
     grade: Int!
     term: Int!
     year: Int!
@@ -74,6 +81,7 @@ export const examTypeDefs = `#graphql
     examPaperId: ID!
     examPaperTitle: String!
     subject: SubjectCode!
+    assessmentType: AssessmentType!
     grade: Int!
     mode: String!
     scoreEarned: Float!
@@ -90,6 +98,8 @@ export const examTypeDefs = `#graphql
     subject: SubjectCode!
     label: String!
     grade: Int!
+    examCount: Int!
+    quizCount: Int!
     paperCount: Int!
     questionCount: Int!
     totalMarksAvailable: Int!
@@ -105,6 +115,8 @@ export const examTypeDefs = `#graphql
     achievementLevel: String!
     papersCompleted: Int!
     totalPapersInGrade: Int!
+    totalExamsInGrade: Int!
+    totalQuizzesInGrade: Int!
     subjectSummaries: [SubjectSummary!]!
     recentAttempts: [ExamAttempt!]!
   }
@@ -135,9 +147,17 @@ export const examTypeDefs = `#graphql
   }
 
   extend type Query {
-    examPapersForGrade(grade: Int!, subject: SubjectCode): [ExamPaper!]!
+    examPapersForGrade(
+      grade: Int!
+      subject: SubjectCode
+      assessmentType: AssessmentType
+    ): [ExamPaper!]!
     examPaperById(id: ID!): ExamPaper
-    myExamAttempts(grade: Int, subject: SubjectCode): [ExamAttempt!]!
+    myExamAttempts(
+      grade: Int
+      subject: SubjectCode
+      assessmentType: AssessmentType
+    ): [ExamAttempt!]!
     examAttemptById(id: ID!): ExamAttempt
     myAcademicProgress(grade: Int!): LearnerProgressSummary!
   }

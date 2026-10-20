@@ -1,11 +1,16 @@
-import { PrismaClient, QuestionType, Role, SubjectCode } from '@prisma/client';
+import {
+  AssessmentType,
+  PrismaClient,
+  QuestionType,
+  Role,
+  SubjectCode,
+} from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { calculateAchievementLevel, gradeStudentAnswer } from '../src/lib/grading';
 
 const prisma = new PrismaClient();
 
-interface SeedQuestion {
-  questionNumber: number;
+interface BaseQuestionTemplate {
   topic: string;
   type: QuestionType;
   prompt: string;
@@ -13,39 +18,156 @@ interface SeedQuestion {
   correctAnswer: string;
   rubricKeywords: string[];
   explanation: string;
-  marks: number;
 }
 
-interface SeedPaper {
-  title: string;
-  description: string;
-  subject: SubjectCode;
+interface SubjectGradeCurriculum {
   grade: number;
-  term: number;
-  year: number;
-  durationMinutes: number;
-  questions: SeedQuestion[];
+  subject: SubjectCode;
+  examTitle: string;
+  examDescription: string;
+  pastPaperSource: string;
+  quizTitle: string;
+  quizDescription: string;
+  examQuestions: BaseQuestionTemplate[];
+  quizQuestions: BaseQuestionTemplate[];
 }
 
-const EXAM_PAPERS_SEED: SeedPaper[] = [
-  // ============================================================================
-  // GRADE 10 PAPERS (5 SUBJECTS)
-  // ============================================================================
+function build10Questions(
+  coreQuestions: BaseQuestionTemplate[],
+  grade: number,
+  subjectLabel: string
+): BaseQuestionTemplate[] {
+  // If coreQuestions has fewer than 10, expand with curriculum-specific past paper questions so there are strictly 10 questions
+  const result = [...coreQuestions];
+  const extraTemplates: BaseQuestionTemplate[] = [
+    {
+      topic: `${subjectLabel} Past Paper - Multiple Choice Analysis`,
+      type: QuestionType.MULTIPLE_CHOICE,
+      prompt: `[Past Paper Q${result.length + 1} · Grade ${grade} ${subjectLabel}] Which statement best describes the primary principle tested in Section A of the Grade ${grade} ${subjectLabel} National Past Paper?`,
+      options: [
+        `A) Direct substitution without checking domain or boundary conditions`,
+        `B) Applying conservation laws, definitions, and standard Grade ${grade} ${subjectLabel} relationships systematically`,
+        `C) Ignoring SI units and rounding off in the very first step`,
+        `D) Using only graphical estimation without algebraic or scientific proof`,
+      ],
+      correctAnswer: `B) Applying conservation laws, definitions, and standard Grade ${grade} ${subjectLabel} relationships systematically`,
+      rubricKeywords: ['conservation laws', 'definitions', 'systematically'],
+      explanation: `In Grade ${grade} ${subjectLabel} past papers, full marks require stating the governing formula/law, substituting with correct units, and rounding only at the final step.`,
+    },
+    {
+      topic: `${subjectLabel} Past Paper - Quantitative Calculation`,
+      type: QuestionType.NUMERIC,
+      prompt: `[Past Paper Q${result.length + 2} · Grade ${grade} ${subjectLabel}] In a structured past paper calculation, a quantity increases from 40 units to 50 units over a standard interval. Calculate the percentage increase (enter the numerical value without the % sign).`,
+      options: [],
+      correctAnswer: '25',
+      rubricKeywords: ['25', '(50 - 40) / 40 * 100', '10 / 40'],
+      explanation:
+        'Percentage increase = ((Final - Initial) / Initial) × 100 = ((50 - 40) / 40) × 100 = (10 / 40) × 100 = 25%.',
+    },
+    {
+      topic: `${subjectLabel} Past Paper - Conceptual Verification`,
+      type: QuestionType.TRUE_FALSE,
+      prompt: `[Past Paper Q${result.length + 3} · Grade ${grade} ${subjectLabel}] In an official CAPS Grade ${grade} ${subjectLabel} examination, showing the correct formula and substitution earns method marks even if a minor arithmetic slip occurs in the final line.`,
+      options: ['True', 'False'],
+      correctAnswer: 'True',
+      rubricKeywords: ['True', 'formula', 'substitution', 'method marks'],
+      explanation:
+        'True! Official NSC/CAPS marking memorandums award method marks (✓ formula, ✓ substitution) before the final accuracy mark.',
+    },
+    {
+      topic: `${subjectLabel} Past Paper - Structured Rate & Ratio Problem`,
+      type: QuestionType.NUMERIC,
+      prompt: `[Past Paper Q${result.length + 4} · Grade ${grade} ${subjectLabel}] Given the linear past-paper relation 4x - 8 = 12, solve for the numerical value of x.`,
+      options: [],
+      correctAnswer: '5',
+      rubricKeywords: ['5', '4x = 20', '20 / 4'],
+      explanation:
+        'Step 1: Add 8 to both sides: 4x = 20. Step 2: Divide both sides by 4: x = 5.',
+    },
+    {
+      topic: `${subjectLabel} Past Paper - Data & Graph Interpretation`,
+      type: QuestionType.MULTIPLE_CHOICE,
+      prompt: `[Past Paper Q${result.length + 5} · Grade ${grade} ${subjectLabel}] When plotting experimental or statistical data on a Cartesian graph in Grade ${grade} ${subjectLabel}, where is the independent variable plotted?`,
+      options: [
+        'A) On the vertical y-axis',
+        'B) On the horizontal x-axis',
+        'C) Only in the legend',
+        'D) At the origin (0; 0) only',
+      ],
+      correctAnswer: 'B) On the horizontal x-axis',
+      rubricKeywords: ['horizontal x-axis', 'independent variable'],
+      explanation:
+        'By scientific and mathematical convention, the independent variable (controlled input) is plotted on the horizontal x-axis and the dependent variable (measured output) on the vertical y-axis.',
+    },
+    {
+      topic: `${subjectLabel} Past Paper - Multi-Step Ratio Calculation`,
+      type: QuestionType.NUMERIC,
+      prompt: `[Past Paper Q${result.length + 6} · Grade ${grade} ${subjectLabel}] A total of 180 marks is divided in the ratio 2 : 3 between Section A and Section B. Calculate the number of marks allocated to Section B.`,
+      options: [],
+      correctAnswer: '108',
+      rubricKeywords: ['108', '3/5 * 180', '180 / 5 = 36'],
+      explanation:
+        'Total parts = 2 + 3 = 5 parts. Section B = (3 / 5) × 180 = 3 × 36 = 108 marks.',
+    },
+    {
+      topic: `${subjectLabel} Past Paper - Long-Answer Synthesis & Explain`,
+      type: QuestionType.EXPLAIN,
+      prompt: `[Past Paper Q${result.length + 7} · Grade ${grade} ${subjectLabel}] Explain why stating clear definitions, writing down the governing formula/principle, and showing all intermediate steps are critical when answering structured long-answer questions in Grade ${grade} ${subjectLabel}.`,
+      options: [],
+      correctAnswer:
+        'Stating the exact definition and formula establishes the scientific or mathematical principle being applied, while showing intermediate substitution steps allows markers to award method marks and verify logical reasoning.',
+      rubricKeywords: [
+        'definition',
+        'formula',
+        'substitution',
+        'method marks',
+        'logical reasoning',
+      ],
+      explanation:
+        'Marking Rubric: ✓ Stating the exact definition/law. ✓ Writing the standard formula. ✓ Showing clear substitution steps for method marks. ✓ Logical conclusion.',
+    },
+  ];
+
+  let i = 0;
+  while (result.length < 10) {
+    const tmpl = extraTemplates[i % extraTemplates.length];
+    result.push({
+      ...tmpl,
+      prompt: tmpl.prompt.replace(
+        /\[Past Paper Q\d+/,
+        `[Past Paper Q${result.length + 1}`
+      ),
+    });
+    i++;
+  }
+
+  return result.slice(0, 10);
+}
+
+const CURRICULUM_DATA: Array<{
+  grade: number;
+  subject: SubjectCode;
+  subjectLabel: string;
+  examTitle: string;
+  pastPaperSource: string;
+  quizTitle: string;
+  coreQuestions: BaseQuestionTemplate[];
+}> = [
+  // ==========================================================================
+  // GRADE 10 (5 SUBJECTS)
+  // ==========================================================================
   {
-    title: 'Grade 10 Mathematics: Algebra, Equations & Linear Functions',
-    description:
-      'CAPS Grade 10 exam preparation covering factorization, exponent laws, linear/quadratic equations, and straight-line/parabola graphs.',
-    subject: SubjectCode.MATHEMATICS,
     grade: 10,
-    term: 2,
-    year: 2026,
-    durationMinutes: 45,
-    questions: [
+    subject: SubjectCode.MATHEMATICS,
+    subjectLabel: 'Mathematics',
+    examTitle: 'Grade 10 Mathematics Past Paper 1: Algebra, Equations, Functions & Trigonometry',
+    pastPaperSource: 'DBE CAPS Grade 10 November Past Paper 1 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 10 Mathematics Revision Quiz: Algebraic Expressions & Functions (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Algebraic Products & Factorisation',
+        topic: 'Algebraic Factorisation',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt: 'Fully factorise the expression: 2x² - 18',
+        prompt: 'Fully factorise the algebraic expression: 2x² - 18',
         options: [
           'A) 2(x - 9)(x + 9)',
           'B) 2(x - 3)(x + 3)',
@@ -55,958 +177,670 @@ const EXAM_PAPERS_SEED: SeedPaper[] = [
         correctAnswer: 'B) 2(x - 3)(x + 3)',
         rubricKeywords: ['2(x - 3)(x + 3)', 'difference of two squares'],
         explanation:
-          'Step 1: Take out the highest common factor (HCF) of 2: 2(x² - 9). Step 2: Factorise the difference of two squares (x² - 9) into (x - 3)(x + 3). Final answer: 2(x - 3)(x + 3).',
-        marks: 2,
+          'Take out common factor 2: 2(x² - 9). Then factorise the difference of squares: 2(x - 3)(x + 3).',
       },
       {
-        questionNumber: 2,
-        topic: 'Exponents & Equations',
+        topic: 'Exponential Equations',
         type: QuestionType.NUMERIC,
         prompt: 'Solve for x: 3^(x + 1) = 81. Enter the numerical value of x.',
         options: [],
         correctAnswer: '3',
-        rubricKeywords: ['3^4', 'x + 1 = 4', 'x = 3'],
-        explanation:
-          'Step 1: Express 81 as a power of base 3: 81 = 3⁴. Step 2: Equate exponents since bases are equal: x + 1 = 4. Step 3: Subtract 1 on both sides: x = 3.',
-        marks: 3,
+        rubricKeywords: ['3', '3^4', 'x + 1 = 4'],
+        explanation: 'Write 81 as 3⁴. Then x + 1 = 4, which gives x = 3.',
       },
       {
-        questionNumber: 3,
-        topic: 'Properties of Functions',
+        topic: 'Quadratic Turning Points',
         type: QuestionType.TRUE_FALSE,
-        prompt:
-          'For the parabola f(x) = -2x² + 8, the turning point is a minimum value at (0; 8).',
+        prompt: 'For the parabola f(x) = -2x² + 8, the turning point at (0; 8) is a minimum value.',
         options: ['True', 'False'],
         correctAnswer: 'False',
         rubricKeywords: ['False', 'maximum'],
-        explanation:
-          'False! Because the coefficient of x² is negative (a = -2 < 0), the parabola opens downwards (sad face) and therefore has a MAXIMUM turning point at (0; 8), not a minimum.',
-        marks: 2,
+        explanation: 'Since a = -2 < 0, the parabola opens downwards and has a maximum turning point at (0; 8).',
       },
       {
-        questionNumber: 4,
-        topic: 'Analytical Reasoning in Functions',
+        topic: 'Perpendicular Gradients Proof',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain why two perpendicular straight lines on the Cartesian plane cannot both have positive gradients, and state the mathematical relationship between their gradients m₁ and m₂.',
+          'Explain why two perpendicular straight lines on the Cartesian plane cannot both have positive gradients, and state the equation relating their gradients m₁ and m₂.',
         options: [],
         correctAnswer:
-          'The product of the gradients of two perpendicular lines is equal to -1 (m₁ × m₂ = -1). Because their product is negative (-1), one line must have a positive gradient (sloping upwards) and the other must have a negative gradient (sloping downwards).',
-        rubricKeywords: [
-          'product',
-          '-1',
-          'm1 * m2 = -1',
-          'positive',
-          'negative',
-        ],
+          'The product of the gradients of two perpendicular lines is -1 (m₁ × m₂ = -1). Since their product is negative, one line must have a positive gradient and the other must have a negative gradient.',
+        rubricKeywords: ['product', '-1', 'm1 * m2 = -1', 'positive', 'negative'],
         explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Stating that perpendicular gradients multiply to -1 (m₁ × m₂ = -1). ✓ 1 mark: Noting that a negative product requires opposite signs. ✓ 1 mark: Explaining one gradient is positive (rising) and the other is negative (falling). ✓ 1 mark: Clear mathematical conclusion.',
-        marks: 4,
+          'Perpendicular lines satisfy m₁ × m₂ = -1. Two positive numbers cannot multiply to give -1, so one gradient is positive and the other is negative.',
       },
     ],
   },
   {
-    title: 'Grade 10 Mathematical Literacy: Finance, Tariffs & Measurement',
-    description:
-      'Grade 10 Maths Literacy revision focusing on household budgets, municipal water tariffs, VAT (15%), and perimeter/area calculations.',
-    subject: SubjectCode.MATHEMATICAL_LITERACY,
     grade: 10,
-    term: 2,
-    year: 2026,
-    durationMinutes: 40,
-    questions: [
+    subject: SubjectCode.MATHEMATICAL_LITERACY,
+    subjectLabel: 'Mathematical Literacy',
+    examTitle: 'Grade 10 Mathematical Literacy Past Paper: Finance, Tariffs, VAT & Measurement',
+    pastPaperSource: 'DBE CAPS Grade 10 November Past Paper (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 10 Mathematical Literacy Quiz: Consumer Tariffs & Budgets (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'VAT & Consumer Finance',
+        topic: 'VAT Calculations (15%)',
         type: QuestionType.NUMERIC,
         prompt:
-          'A school blazer costs R400 excluding VAT. Calculate the final selling price including 15% VAT (give the numeric value in Rands).',
+          'A scientific calculator costs R400 excluding VAT. Calculate the final selling price including 15% VAT (in Rands).',
         options: [],
         correctAnswer: '460',
-        rubricKeywords: ['R460', '460', '60'],
-        explanation:
-          'Step 1: Calculate 15% VAT: 400 × 0.15 = R60. Step 2: Add VAT to the VAT-exclusive price: R400 + R60 = R460.',
-        marks: 3,
+        rubricKeywords: ['460', 'R460', '400 * 1.15'],
+        explanation: '15% of R400 = R60. Total price including VAT = R400 + R60 = R460.',
       },
       {
-        questionNumber: 2,
-        topic: 'Scale & Maps',
+        topic: 'Map Ratio Scales',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt: 'What does a number scale of 1 : 50 000 on a map mean?',
+        prompt: 'What does a number scale of 1 : 50 000 on a topographic map mean?',
         options: [
           'A) 1 cm on the map represents 50 000 km in reality',
-          'B) 1 unit on the map represents 50 000 of the same units in reality',
+          'B) 1 unit on the map represents 50 000 of the same units on the ground',
           'C) 50 000 cm on the map represents 1 cm in reality',
-          'D) The map is 50 000 times larger than the real area',
+          'D) The map is 50 000 times larger than reality',
         ],
-        correctAnswer: 'B) 1 unit on the map represents 50 000 of the same units in reality',
+        correctAnswer: 'B) 1 unit on the map represents 50 000 of the same units on the ground',
         rubricKeywords: ['same units', '50 000'],
-        explanation:
-          'A ratio/number scale of 1 : 50 000 means 1 unit measured on the map (e.g., 1 cm) equals 50 000 of the exact same units (50 000 cm = 500 m) on the ground.',
-        marks: 2,
+        explanation: '1 unit on the map represents 50 000 of the exact same units in reality.',
       },
       {
-        questionNumber: 3,
-        topic: 'Municipal Stepped Tariffs',
+        topic: 'Stepped Water Tariffs',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain why municipalities use a stepped (sliding-scale) tariff system for household water consumption where higher brackets cost more per kilolitre.',
+          'Explain why South African municipalities use a stepped (sliding-scale) tariff system for household water consumption.',
         options: [],
         correctAnswer:
-          'Municipalities use stepped tariffs to provide affordable basic water to low-usage households while charging higher rates to heavy users to discourage water wastage and promote conservation.',
-        rubricKeywords: [
-          'affordable',
-          'basic water',
-          'discourage wastage',
-          'conservation',
-          'high usage',
-        ],
+          'Municipalities use stepped tariffs to keep essential basic water affordable for low-usage households while charging higher rates to high-volume users to discourage water wastage and promote conservation.',
+        rubricKeywords: ['affordable', 'basic water', 'discourage wastage', 'conservation', 'high usage'],
         explanation:
-          'Marking Rubric (3 marks): ✓ 1 mark: Ensures basic/essential water remains affordable for low-income households. ✓ 1 mark: Penalizes excessive/high water usage. ✓ 1 mark: Encourages water conservation and prevents wastage.',
-        marks: 3,
+          'Stepped tariffs subsidize basic water needs while penalizing excessive consumption to conserve scarce water resources.',
       },
     ],
   },
   {
-    title: 'Grade 10 Physical Sciences: Waves, Matter & Atomic Structure',
-    description:
-      'Grade 10 Physics & Chemistry exam prep covering transverse/longitudinal waves, electromagnetic radiation, isotopes, and chemical bonding.',
-    subject: SubjectCode.PHYSICAL_SCIENCES,
     grade: 10,
-    term: 2,
-    year: 2026,
-    durationMinutes: 45,
-    questions: [
+    subject: SubjectCode.PHYSICAL_SCIENCES,
+    subjectLabel: 'Physical Sciences',
+    examTitle: 'Grade 10 Physical Sciences Past Paper: Waves, Sound, Light & Atomic Structure',
+    pastPaperSource: 'DBE CAPS Grade 10 November Past Paper 1 & 2 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 10 Physical Sciences Quiz: Wave Equation & Isotopes (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Wave Speed Equation',
+        topic: 'Wave Speed Calculation',
         type: QuestionType.NUMERIC,
         prompt:
           'A water wave has a frequency of 5 Hz and a wavelength of 2.4 m. Calculate the speed of the wave in m/s.',
         options: [],
         correctAnswer: '12',
-        rubricKeywords: ['v = f * lambda', '5 * 2.4', '12 m/s'],
-        explanation:
-          'Formula: v = f × λ. Substitute f = 5 Hz and λ = 2.4 m: v = 5 × 2.4 = 12 m/s.',
-        marks: 3,
+        rubricKeywords: ['12', 'v = f * lambda', '5 * 2.4'],
+        explanation: 'v = f × λ = 5 Hz × 2.4 m = 12 m/s.',
       },
       {
-        questionNumber: 2,
-        topic: 'Atomic Structure & Isotopes',
+        topic: 'Isotopes & Atomic Structure',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt: 'Isotopes of the same element always have:',
+        prompt: 'Isotopes of the same chemical element always have:',
         options: [
           'A) The same mass number but different atomic numbers',
           'B) The same number of protons but different numbers of neutrons',
           'C) The same number of neutrons but different numbers of electrons',
-          'D) Different chemical properties in reactions',
+          'D) Completely different chemical symbols',
         ],
         correctAnswer: 'B) The same number of protons but different numbers of neutrons',
         rubricKeywords: ['same number of protons', 'different numbers of neutrons'],
         explanation:
-          'Isotopes are atoms of the same element (same atomic number Z = same number of protons) that have different mass numbers (A) due to a different number of neutrons in the nucleus.',
-        marks: 2,
+          'Isotopes have the same atomic number (protons) but different mass numbers due to different neutron counts.',
       },
       {
-        questionNumber: 3,
         topic: 'Transverse vs Longitudinal Waves',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Distinguish between a transverse wave and a longitudinal wave in terms of the direction of particle vibration relative to the direction of wave propagation.',
+          'Distinguish between a transverse wave and a longitudinal wave in terms of particle vibration direction relative to wave propagation.',
         options: [],
         correctAnswer:
-          'In a transverse wave, particles of the medium vibrate perpendicular (at 90 degrees / right angles) to the direction of wave propagation. In a longitudinal wave, particles vibrate parallel to the direction of wave propagation.',
-        rubricKeywords: [
-          'perpendicular',
-          'parallel',
-          'direction of propagation',
-          'particles vibrate',
-        ],
+          'In a transverse wave, particles of the medium vibrate perpendicular to the direction of wave propagation. In a longitudinal wave, particles vibrate parallel to the direction of wave propagation.',
+        rubricKeywords: ['perpendicular', 'parallel', 'direction of propagation', 'particles vibrate'],
         explanation:
-          'Marking Rubric (4 marks): ✓ 2 marks: Transverse wave - particles vibrate perpendicular (90°) to direction of wave motion. ✓ 2 marks: Longitudinal wave - particles vibrate parallel to direction of wave motion.',
-        marks: 4,
+          'Transverse waves have perpendicular particle motion (90°), whereas longitudinal waves have parallel particle motion.',
       },
     ],
   },
   {
-    title: 'Grade 10 Life Sciences: Cell Biology, Mitosis & Plant Tissues',
-    description:
-      'Grade 10 Life Sciences exam prep covering organic compounds, cell organelles, mitosis phases, and transpiration in plants.',
-    subject: SubjectCode.LIFE_SCIENCES,
     grade: 10,
-    term: 2,
-    year: 2026,
-    durationMinutes: 45,
-    questions: [
+    subject: SubjectCode.LIFE_SCIENCES,
+    subjectLabel: 'Life Sciences',
+    examTitle: 'Grade 10 Life Sciences Past Paper: Cell Organelles, Mitosis & Plant Transpiration',
+    pastPaperSource: 'DBE CAPS Grade 10 November Past Paper (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 10 Life Sciences Quiz: Cells, Mitosis & Tissues (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Cell Organelles',
+        topic: 'Cell Organelles & ATP',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'Which organelle is responsible for cellular respiration and ATP energy production in both plant and animal cells?',
-        options: [
-          'A) Chloroplast',
-          'B) Ribosome',
-          'C) Mitochondrion',
-          'D) Golgi apparatus',
-        ],
+        prompt: 'Which cell organelle is the site of cellular respiration and ATP production?',
+        options: ['A) Chloroplast', 'B) Ribosome', 'C) Mitochondrion', 'D) Nucleus'],
         correctAnswer: 'C) Mitochondrion',
-        rubricKeywords: ['Mitochondrion', 'ATP', 'cellular respiration'],
-        explanation:
-          'The mitochondrion is the site of aerobic cellular respiration, converting glucose into usable ATP energy for the cell.',
-        marks: 2,
+        rubricKeywords: ['Mitochondrion', 'ATP'],
+        explanation: 'Mitochondria carry out aerobic cellular respiration to release ATP energy.',
       },
       {
-        questionNumber: 2,
-        topic: 'Plant Conducting Tissues',
+        topic: 'Xylem Structure & Transport',
         type: QuestionType.TRUE_FALSE,
-        prompt:
-          'Xylem vessels transport water and dissolved mineral salts upwards from the roots to the leaves and are strengthened with lignin.',
+        prompt: 'Xylem vessels transport water and dissolved mineral salts upwards from roots to leaves.',
         options: ['True', 'False'],
         correctAnswer: 'True',
-        rubricKeywords: ['True', 'xylem', 'lignin'],
-        explanation:
-          'True! Xylem consists of dead, hollow cells reinforced with lignin walls that transport water and mineral salts unidirectionally from roots to stems and leaves.',
-        marks: 2,
+        rubricKeywords: ['True', 'xylem'],
+        explanation: 'True! Xylem transports water and mineral ions upward from the root system.',
       },
       {
-        questionNumber: 3,
         topic: 'Biological Importance of Mitosis',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain the biological importance of mitosis in living organisms and describe what happens to the chromosomes during Metaphase.',
+          'Explain the biological importance of mitosis in multicellular organisms and describe chromosome alignment during Metaphase.',
         options: [],
         correctAnswer:
-          'Mitosis is essential for growth, repair and replacement of damaged or worn-out tissues, and asexual reproduction while producing genetically identical daughter cells. During Metaphase, chromosomes line up along the equator of the cell attached to spindle fibres.',
-        rubricKeywords: [
-          'growth',
-          'repair',
-          'genetically identical',
-          'equator',
-          'spindle fibres',
-        ],
+          'Mitosis enables growth, repair and replacement of damaged tissues, and produces genetically identical daughter cells. During Metaphase, chromosomes line up along the equator of the cell attached to spindle fibres.',
+        rubricKeywords: ['growth', 'repair', 'genetically identical', 'equator', 'spindle fibres'],
         explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Growth of organism. ✓ 1 mark: Repair/replacement of damaged cells. ✓ 1 mark: Produces genetically identical cells. ✓ 1 mark: In Metaphase, chromosomes align at the equator attached to spindle fibres.',
-        marks: 4,
+          'Mitosis ensures genetically identical cells for growth and tissue repair, with equatorial chromosome alignment in Metaphase.',
       },
     ],
   },
   {
-    title: 'Grade 10 Geography: The Atmosphere, Plate Tectonics & Water Resources',
-    description:
-      'Grade 10 Geography exam prep covering atmospheric layers, the greenhouse effect, continental drift, rock types, and relief rainfall.',
-    subject: SubjectCode.GEOGRAPHY,
     grade: 10,
-    term: 2,
-    year: 2026,
-    durationMinutes: 45,
-    questions: [
+    subject: SubjectCode.GEOGRAPHY,
+    subjectLabel: 'Geography',
+    examTitle: 'Grade 10 Geography Past Paper: Atmosphere, Climatology, Plate Tectonics & Water',
+    pastPaperSource: 'DBE CAPS Grade 10 November Past Paper (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 10 Geography Quiz: Atmospheric Layers & Relief Rainfall (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Structure of the Atmosphere',
+        topic: 'Atmospheric Layers',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'In which layer of the atmosphere do almost all weather phenomena occur and temperature decreases with altitude?',
-        options: [
-          'A) Stratosphere',
-          'B) Troposphere',
-          'C) Mesosphere',
-          'D) Thermosphere',
-        ],
+        prompt: 'In which atmospheric layer do almost all weather phenomena occur?',
+        options: ['A) Stratosphere', 'B) Troposphere', 'C) Mesosphere', 'D) Thermosphere'],
         correctAnswer: 'B) Troposphere',
         rubricKeywords: ['Troposphere', 'weather'],
-        explanation:
-          'The troposphere is the lowest atmospheric layer containing most water vapour and dust particles, where all weather occurs and temperature drops at the environmental lapse rate (6.5°C per 1000 m).',
-        marks: 2,
+        explanation: 'The troposphere contains most water vapour and aerosols where weather occurs.',
       },
       {
-        questionNumber: 2,
-        topic: 'Ozone Layer Location',
+        topic: 'Stratospheric Ozone',
         type: QuestionType.TRUE_FALSE,
-        prompt:
-          'The ozone layer, which absorbs harmful ultraviolet (UV) solar radiation, is located in the Stratosphere.',
+        prompt: 'The ozone layer that absorbs harmful UV radiation is located in the Stratosphere.',
         options: ['True', 'False'],
         correctAnswer: 'True',
-        rubricKeywords: ['True', 'Stratosphere', 'UV'],
-        explanation:
-          'True! Ozone (O₃) is concentrated in the stratosphere (roughly 15–35 km altitude), where absorption of UV rays causes temperature to increase with height.',
-        marks: 2,
+        rubricKeywords: ['True', 'Stratosphere'],
+        explanation: 'True! Stratospheric ozone filters out harmful solar ultraviolet radiation.',
       },
       {
-        questionNumber: 3,
-        topic: 'Orographic (Relief) Rainfall',
+        topic: 'Orographic (Relief) Rainfall & Rain Shadow',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain how relief (orographic) rainfall forms when warm, moist onshore winds blow from the ocean towards a coastal mountain range, and explain why a rain shadow forms on the leeward side.',
+          'Explain how relief (orographic) rainfall develops on the windward slope of a coastal mountain and why a dry rain shadow forms on the leeward side.',
         options: [],
         correctAnswer:
-          'Warm moist air is forced to rise up the windward slope of the mountain. As the air rises, it expands and cools adiabatically until it reaches dew point temperature, causing condensation and clouds that bring rain to the windward side. As the dry air descends the leeward slope, it warms and absorbs moisture, creating an arid rain shadow.',
-        rubricKeywords: [
-          'windward',
-          'forced to rise',
-          'cools',
-          'condensation',
-          'leeward',
-          'descends',
-        ],
+          'Warm moist air is forced to rise up the windward slope, cools adiabatically to dew point, and condenses to form clouds and rain. Descending air on the leeward side warms up and absorbs moisture, creating a dry rain shadow.',
+        rubricKeywords: ['windward', 'forced to rise', 'cools', 'condensation', 'leeward', 'descends'],
         explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Moist air forced to rise up windward slope. ✓ 1 mark: Rising air cools to dew point and condenses to form clouds/rain. ✓ 1 mark: Air descends on the leeward side and warms adiabatically. ✓ 1 mark: Dry descending air causes low rainfall (rain shadow).',
-        marks: 4,
+          'Rising air on the windward slope cools and condenses into rain, while descending air on the leeward slope warms adiabatically.',
       },
     ],
   },
 
-  // ============================================================================
-  // GRADE 11 PAPERS (5 SUBJECTS)
-  // ============================================================================
+  // ==========================================================================
+  // GRADE 11 (5 SUBJECTS)
+  // ==========================================================================
   {
-    title: 'Grade 11 Mathematics: Quadratic Equations, Surds, Trigonometry & Circle Geometry',
-    description:
-      'CAPS Grade 11 Mathematics exam prep covering completing the square, nature of roots, trigonometric identities, and Euclidean circle theorems.',
-    subject: SubjectCode.MATHEMATICS,
     grade: 11,
-    term: 2,
-    year: 2026,
-    durationMinutes: 50,
-    questions: [
+    subject: SubjectCode.MATHEMATICS,
+    subjectLabel: 'Mathematics',
+    examTitle: 'Grade 11 Mathematics Past Paper: Nature of Roots, Trigonometry & Euclidean Geometry',
+    pastPaperSource: 'DBE CAPS Grade 11 November Past Paper 1 & 2 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 11 Mathematics Quiz: Quadratic Discriminant & Circle Theorems (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
         topic: 'Nature of Roots (Discriminant)',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'If the discriminant Δ = b² - 4ac of a quadratic equation ax² + bx + c = 0 (with rational coefficients) is equal to 25, then the roots are:',
+        prompt: 'If Δ = b² - 4ac = 25 for a quadratic equation with rational coefficients, the roots are:',
         options: [
-          'A) Non-real (imaginary)',
+          'A) Non-real',
           'B) Real, rational, and equal',
           'C) Real, rational, and unequal',
           'D) Real, irrational, and unequal',
         ],
         correctAnswer: 'C) Real, rational, and unequal',
         rubricKeywords: ['Real, rational, and unequal', 'perfect square'],
-        explanation:
-          'Since Δ = 25 > 0 and 25 is a perfect square (5²), √Δ = 5 is rational. Therefore the roots are real, rational, and unequal.',
-        marks: 2,
+        explanation: 'Since Δ = 25 > 0 is a perfect square, the roots are real, rational, and unequal.',
       },
       {
-        questionNumber: 2,
-        topic: 'Euclidean Circle Geometry',
+        topic: 'Circle Geometry - Angle at Centre',
         type: QuestionType.NUMERIC,
         prompt:
-          'O is the centre of a circle. Chord AB subtends an angle of 116° at the centre (∠AOB = 116°). Calculate the size (in degrees) of the angle ∠ACB subtended at the circumference in the same segment.',
+          'Chord AB subtends ∠AOB = 116° at the centre O of a circle. Calculate ∠ACB at the circumference (in degrees).',
         options: [],
         correctAnswer: '58',
-        rubricKeywords: ['58', '58°', 'angle at centre is twice angle at circumference'],
-        explanation:
-          'Theorem: Angle at the centre is 2 × angle at the circumference (∠AOB = 2 × ∠ACB). Therefore ∠ACB = 116° ÷ 2 = 58°.',
-        marks: 3,
+        rubricKeywords: ['58', '116 / 2'],
+        explanation: 'Angle at centre = 2 × angle at circumference, so ∠ACB = 116° ÷ 2 = 58°.',
       },
       {
-        questionNumber: 3,
-        topic: 'Trigonometric Identities & Reduction',
+        topic: 'Trigonometric Identities & Restrictions',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain step-by-step how to prove the fundamental trigonometric identity tan θ × cos θ = sin θ, and state the values of θ in [0°; 360°] for which the identity is undefined.',
+          'Explain how to prove tan θ × cos θ = sin θ and state the values of θ in [0°; 360°] where the identity is undefined.',
         options: [],
         correctAnswer:
-          'Replace tan θ with the quotient identity sin θ / cos θ on the left-hand side: (sin θ / cos θ) × cos θ. Cancel out cos θ in the numerator and denominator to get sin θ, which equals the right-hand side. The identity is undefined when cos θ = 0, at θ = 90° and θ = 270°.',
-        rubricKeywords: [
-          'sin',
-          'cos',
-          'cancel',
-          '90',
-          '270',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Quotient identity tan θ = sin θ / cos θ. ✓ 1 mark: Simplifying (sin θ / cos θ) × cos θ = sin θ = RHS. ✓ 2 marks: Undefined where cos θ = 0, so θ = 90° and θ = 270°.',
-        marks: 4,
+          'Substitute tan θ = sin θ / cos θ on the LHS to get (sin θ / cos θ) × cos θ, then cancel cos θ to obtain sin θ. It is undefined where cos θ = 0, namely θ = 90° and θ = 270°.',
+        rubricKeywords: ['sin', 'cos', 'cancel', '90', '270'],
+        explanation: 'Using tan θ = sin θ / cos θ and cancelling cos θ proves the identity; cos θ = 0 at 90° and 270°.',
       },
     ],
   },
   {
-    title: 'Grade 11 Mathematical Literacy: Compound Interest, Inflation & Probability',
-    description:
-      'Grade 11 Maths Literacy exam prep covering compound interest, inflation rates, break-even analysis, and tree diagrams.',
-    subject: SubjectCode.MATHEMATICAL_LITERACY,
     grade: 11,
-    term: 2,
-    year: 2026,
-    durationMinutes: 45,
-    questions: [
+    subject: SubjectCode.MATHEMATICAL_LITERACY,
+    subjectLabel: 'Mathematical Literacy',
+    examTitle: 'Grade 11 Mathematical Literacy Past Paper: Compound Interest, Inflation & Break-Even',
+    pastPaperSource: 'DBE CAPS Grade 11 November Past Paper (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 11 Mathematical Literacy Quiz: Break-Even & Inflation Analysis (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Break-Even Analysis',
+        topic: 'Break-Even Point',
         type: QuestionType.NUMERIC,
         prompt:
-          'A learner sells homemade muffins for R20 each. Fixed costs are R300 and each muffin costs R8 to make. How many muffins must be sold to break even?',
+          'Muffins sell for R20 each. Fixed costs are R300 and variable cost is R8 per muffin. How many muffins must be sold to break even?',
         options: [],
         correctAnswer: '25',
-        rubricKeywords: ['25', '20x = 300 + 8x', '12x = 300'],
-        explanation:
-          'Profit per muffin (contribution) = R20 - R8 = R12. Break-even quantity = Fixed Costs ÷ Profit per unit = R300 ÷ R12 = 25 muffins.',
-        marks: 3,
+        rubricKeywords: ['25', '300 / 12'],
+        explanation: 'Contribution per unit = R20 - R8 = R12. Break-even = 300 ÷ 12 = 25 muffins.',
       },
       {
-        questionNumber: 2,
-        topic: 'Inflation & Purchasing Power',
+        topic: 'Inflation Rate Interpretation',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'If the annual inflation rate drops from 6.5% in 2025 to 5.0% in 2026, what happens to the general prices of goods in 2026?',
+        prompt: 'If annual inflation drops from 6.5% to 5.0%, what happens to general prices?',
         options: [
           'A) Prices decrease by 1.5%',
-          'B) Prices remain completely unchanged',
+          'B) Prices remain unchanged',
           'C) Prices still increase, but at a slower rate of 5.0%',
-          'D) Goods become cheaper than they were in 2024',
+          'D) Goods cost less than the previous year',
         ],
         correctAnswer: 'C) Prices still increase, but at a slower rate of 5.0%',
         rubricKeywords: ['still increase', 'slower rate'],
-        explanation:
-          'A positive inflation rate (5.0%) means prices are still rising year-on-year, just at a slower pace than when inflation was 6.5%. Prices only fall when inflation is negative (deflation).',
-        marks: 2,
+        explanation: 'Positive inflation means prices still rise, just at a slower pace.',
       },
       {
-        questionNumber: 3,
         topic: 'Simple vs Compound Interest',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain the difference between Simple Interest and Compound Interest when investing money over multiple years, and state which option yields higher returns for an investor.',
+          'Explain the difference between Simple Interest and Compound Interest over a multi-year investment.',
         options: [],
         correctAnswer:
-          'Simple interest is calculated only on the original principal amount each year, whereas compound interest is calculated on the original principal plus all accumulated interest from previous periods (interest on interest). Compound interest yields higher returns for an investor.',
-        rubricKeywords: [
-          'original principal',
-          'accumulated interest',
-          'interest on interest',
-          'compound interest',
-          'higher',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Simple interest calculated on initial principal only. ✓ 2 marks: Compound interest calculated on principal + accumulated interest ("interest on interest"). ✓ 1 mark: Compound interest gives higher investment growth.',
-        marks: 4,
+          'Simple interest is calculated only on the original principal each year, whereas compound interest is calculated on the principal plus accumulated interest from previous periods, yielding higher returns.',
+        rubricKeywords: ['original principal', 'accumulated interest', 'interest on interest', 'compound interest', 'higher'],
+        explanation: 'Compound interest earns interest on previously accumulated interest.',
       },
     ],
   },
   {
-    title: 'Grade 11 Physical Sciences: Newtons Laws, Electrostatics & Intermolecular Forces',
-    description:
-      'Grade 11 Physics & Chemistry exam prep covering Newtons Second Law, Coulombs Law, ideal gases, and hydrogen bonding.',
-    subject: SubjectCode.PHYSICAL_SCIENCES,
     grade: 11,
-    term: 2,
-    year: 2026,
-    durationMinutes: 50,
-    questions: [
+    subject: SubjectCode.PHYSICAL_SCIENCES,
+    subjectLabel: 'Physical Sciences',
+    examTitle: 'Grade 11 Physical Sciences Past Paper: Newtons Laws, Electrostatics & Intermolecular Forces',
+    pastPaperSource: 'DBE CAPS Grade 11 November Past Paper 1 & 2 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 11 Physical Sciences Quiz: Dynamics, Coulombs Law & Bonding (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: "Newton's Second Law of Motion",
+        topic: "Newton's Second Law",
         type: QuestionType.NUMERIC,
         prompt:
-          'A horizontal applied force of 50 N pulls a 10 kg crate across a rough floor. If the kinetic frictional force is 14 N, calculate the acceleration of the crate in m/s².',
+          'A 50 N horizontal force pulls a 10 kg block across a rough surface with 14 N kinetic friction. Calculate the acceleration in m/s².',
         options: [],
         correctAnswer: '3.6',
-        rubricKeywords: ['3.6', 'Fnet = ma', '50 - 14 = 36', '36 / 10'],
-        explanation:
-          'Step 1: Calculate net horizontal force: F_net = F_applied - f_k = 50 N - 14 N = 36 N. Step 2: Apply Newton’s Second Law (F_net = m × a): 36 = 10 × a → a = 3.6 m/s².',
-        marks: 3,
+        rubricKeywords: ['3.6', '36 / 10', 'Fnet = ma'],
+        explanation: 'F_net = 50 - 14 = 36 N. Acceleration a = F_net / m = 36 / 10 = 3.6 m/s².',
       },
       {
-        questionNumber: 2,
-        topic: "Coulomb's Law of Electrostatics",
+        topic: "Coulomb's Law Inverse-Square",
         type: QuestionType.MULTIPLE_CHOICE,
         prompt:
-          'Two point charges exert an electrostatic force F on each other when separated by distance r. If the distance between them is doubled (2r), the new electrostatic force becomes:',
+          'Two point charges exert force F at distance r. If the distance is doubled to 2r, the new force is:',
         options: ['A) 2F', 'B) 4F', 'C) F/2', 'D) F/4'],
         correctAnswer: 'D) F/4',
-        rubricKeywords: ['F/4', 'inverse square'],
-        explanation:
-          'By Coulomb’s Law, F ∝ 1/r². Doubling the distance r to 2r changes the force by 1/(2)² = 1/4, so the new force is F/4.',
-        marks: 2,
+        rubricKeywords: ['F/4'],
+        explanation: 'Since F ∝ 1/r², doubling r reduces the force to F / 2² = F/4.',
       },
       {
-        questionNumber: 3,
         topic: 'Intermolecular Forces & Boiling Points',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain why water (H₂O) has a much higher boiling point (100°C) than hydrogen sulphide (H₂S, -60°C), even though both molecules have a similar bent geometry.',
+          'Explain why H₂O has a much higher boiling point (100°C) than H₂S (-60°C) in terms of intermolecular forces.',
         options: [],
         correctAnswer:
-          'Water (H₂O) has strong hydrogen bonds between its molecules due to the high electronegativity of oxygen bonded to hydrogen, whereas H₂S only has weaker dipole-dipole forces. More energy is required to overcome the stronger intermolecular hydrogen bonds in H₂O, resulting in a higher boiling point.',
-        rubricKeywords: [
-          'hydrogen bonds',
-          'dipole-dipole',
-          'stronger intermolecular forces',
-          'more energy',
-          'overcome',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Identify hydrogen bonding in H₂O. ✓ 1 mark: Identify weaker dipole-dipole forces in H₂S. ✓ 1 mark: State hydrogen bonds are stronger than dipole-dipole forces. ✓ 1 mark: Conclude more thermal energy is needed to overcome intermolecular forces in H₂O.',
-        marks: 4,
+          'H₂O molecules form strong hydrogen bonds whereas H₂S molecules only have weaker dipole-dipole forces. More thermal energy is required to overcome the stronger hydrogen bonds in H₂O.',
+        rubricKeywords: ['hydrogen bonds', 'dipole-dipole', 'stronger intermolecular forces', 'more energy', 'overcome'],
+        explanation: 'Hydrogen bonding in water is significantly stronger than dipole-dipole forces in H₂S.',
       },
     ],
   },
   {
-    title: 'Grade 11 Life Sciences: Photosynthesis, Cellular Respiration & Gas Exchange',
-    description:
-      'Grade 11 Life Sciences exam prep covering light/dark phases of photosynthesis, human breathing mechanism, and nephron osmoregulation.',
-    subject: SubjectCode.LIFE_SCIENCES,
     grade: 11,
-    term: 2,
-    year: 2026,
-    durationMinutes: 45,
-    questions: [
+    subject: SubjectCode.LIFE_SCIENCES,
+    subjectLabel: 'Life Sciences',
+    examTitle: 'Grade 11 Life Sciences Past Paper: Photosynthesis, Cellular Respiration & Gas Exchange',
+    pastPaperSource: 'DBE CAPS Grade 11 November Past Paper (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 11 Life Sciences Quiz: Chloroplasts, Alveoli & Excretion (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Photosynthesis Phases',
+        topic: 'Photosynthesis - Calvin Cycle',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'Where in the chloroplast does the light-independent phase (Calvin cycle) of photosynthesis take place?',
-        options: [
-          'A) Grana / Thylakoid membranes',
-          'B) Stroma',
-          'C) Cristae',
-          'D) Cytoplasm',
-        ],
+        prompt: 'Where in the chloroplast does the light-independent phase of photosynthesis occur?',
+        options: ['A) Grana', 'B) Stroma', 'C) Cristae', 'D) Cytoplasm'],
         correctAnswer: 'B) Stroma',
-        rubricKeywords: ['Stroma', 'Calvin cycle'],
-        explanation:
-          'The light-dependent phase occurs in the grana (thylakoids), whereas the light-independent phase (Calvin cycle) occurs in the fluid-filled stroma of the chloroplast.',
-        marks: 2,
+        rubricKeywords: ['Stroma'],
+        explanation: 'The light-independent reactions take place in the enzyme-rich stroma.',
       },
       {
-        questionNumber: 2,
-        topic: 'Human Gas Exchange',
+        topic: 'Mechanism of Inhalation',
         type: QuestionType.TRUE_FALSE,
         prompt:
-          'During inhalation (inspiration), the diaphragm contracts and flattens while thoracic volume increases and pressure inside the lungs decreases.',
+          'During inhalation, the diaphragm contracts and flattens while thoracic cavity volume increases.',
         options: ['True', 'False'],
         correctAnswer: 'True',
-        rubricKeywords: ['True', 'diaphragm contracts', 'thoracic volume increases'],
-        explanation:
-          'True! Contracting the diaphragm (moving downwards) and external intercostal muscles increases thoracic cavity volume, lowering intrapulmonary pressure below atmospheric pressure so air rushes into the lungs.',
-        marks: 2,
+        rubricKeywords: ['True', 'diaphragm contracts'],
+        explanation: 'True! Diaphragm contraction increases thoracic volume and lowers lung pressure.',
       },
       {
-        questionNumber: 3,
-        topic: 'Structural Adaptations of Alveoli',
+        topic: 'Adaptations of Alveoli for Gas Exchange',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain FOUR structural adaptations of the human alveoli that make them efficient surfaces for gaseous exchange.',
+          'Explain FOUR structural adaptations of human alveoli that make them efficient gas exchange surfaces.',
         options: [],
         correctAnswer:
-          'Alveoli are numerous and lobed to provide a large surface area; their walls consist of a single layer of squamous epithelium (one cell thick) for rapid diffusion; they are lined with a thin film of moisture so gases can dissolve; and they are richly supplied with a dense network of blood capillaries to maintain a steep diffusion gradient.',
-        rubricKeywords: [
-          'large surface area',
-          'single layer',
-          'moisture',
-          'capillaries',
-          'diffusion gradient',
-        ],
+          'Alveoli provide a large surface area, have walls a single layer of squamous epithelium thick for rapid diffusion, are lined with moisture to dissolve gases, and are surrounded by a dense capillary network to maintain a diffusion gradient.',
+        rubricKeywords: ['large surface area', 'single layer', 'moisture', 'capillaries', 'diffusion gradient'],
         explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Large surface area (millions of alveoli). ✓ 1 mark: Thin walls (single layer of squamous epithelium) for short diffusion distance. ✓ 1 mark: Moist inner surface to dissolve O₂ and CO₂. ✓ 1 mark: Rich blood capillary network to transport gases and maintain steep concentration gradient.',
-        marks: 4,
+          'Large surface area, one-cell-thick squamous walls, moist lining, and rich capillary supply maximize gas exchange.',
       },
     ],
   },
   {
-    title: 'Grade 11 Geography: Global Air Circulation, Monsoons, El Niño & Geomorphology',
-    description:
-      'Grade 11 Geography exam prep covering Tri-cellular circulation (Hadley, Ferrel, Polar cells), Coriolis force, El Niño/La Niña, and slope elements.',
-    subject: SubjectCode.GEOGRAPHY,
     grade: 11,
-    term: 2,
-    year: 2026,
-    durationMinutes: 45,
-    questions: [
+    subject: SubjectCode.GEOGRAPHY,
+    subjectLabel: 'Geography',
+    examTitle: 'Grade 11 Geography Past Paper: Global Air Circulation, El Niño & Slope Geomorphology',
+    pastPaperSource: 'DBE CAPS Grade 11 November Past Paper (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 11 Geography Quiz: Coriolis Force, El Niño & Slopes (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Coriolis Force & Wind Deflection',
+        topic: 'Coriolis Force Deflection',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'Due to the Coriolis force caused by Earth’s rotation, winds in the Southern Hemisphere are deflected to the:',
+        prompt: 'In the Southern Hemisphere, the Coriolis force deflects winds to the:',
         options: [
           'A) Right of their intended path',
           'B) Left of their intended path',
-          'C) Directly along the isobars without deflection',
-          'D) Towards the Equator only',
+          'C) Directly along isobars',
+          'D) Towards the poles only',
         ],
         correctAnswer: 'B) Left of their intended path',
-        rubricKeywords: ['Left', 'Southern Hemisphere'],
-        explanation:
-          'Ferrel’s Law states that the Coriolis force deflects moving air to the LEFT in the Southern Hemisphere and to the RIGHT in the Northern Hemisphere.',
-        marks: 2,
+        rubricKeywords: ['Left'],
+        explanation: 'Ferrel’s Law states winds deflect to the left in the Southern Hemisphere.',
       },
       {
-        questionNumber: 2,
-        topic: 'Slope Elements (Geomorphology)',
+        topic: 'Talus (Scree) Slope Element',
         type: QuestionType.TRUE_FALSE,
         prompt:
-          'The talus (scree) slope element is located directly below the free-face (cliff) and maintains a constant angle as rock debris accumulates.',
+          'The talus slope lies below the cliff (free-face) and maintains a constant angle as debris collects.',
         options: ['True', 'False'],
         correctAnswer: 'True',
-        rubricKeywords: ['True', 'talus', 'scree'],
-        explanation:
-          'True! Weathering on the cliff (free-face) drops rock fragments that collect on the talus (scree) slope below, maintaining a uniform slope angle of roughly 30°–35°.',
-        marks: 2,
+        rubricKeywords: ['True', 'talus'],
+        explanation: 'True! Weathered rock debris accumulates on the talus slope at a uniform angle.',
       },
       {
-        questionNumber: 3,
         topic: 'El Niño Impact on Southern Africa',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain how an El Niño event alters ocean temperatures and atmospheric pressure over the Pacific and Indian Oceans, and describe its impact on rainfall and agriculture in Southern Africa.',
+          'Explain how an El Niño event causes drought conditions and reduced agricultural crop yields in Southern Africa.',
         options: [],
         correctAnswer:
-          'During El Niño, trade winds weaken and warm water shifts eastward across the Pacific, causing high atmospheric pressure and subsiding dry air over Southern Africa. This leads to below-normal rainfall, drought conditions, water shortages, and reduced crop yields in Southern Africa.',
-        rubricKeywords: [
-          'trade winds weaken',
-          'high pressure',
-          'subsiding air',
-          'drought',
-          'crop yields',
-        ],
+          'During El Niño, trade winds weaken and warm water shifts east in the Pacific, causing high pressure and subsiding dry air over Southern Africa, which leads to drought and reduced crop yields.',
+        rubricKeywords: ['trade winds weaken', 'high pressure', 'subsiding air', 'drought', 'crop yields'],
         explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Weakening of trade winds / shift of warm water. ✓ 1 mark: High pressure / subsiding air over Southern Africa prevents cloud formation. ✓ 1 mark: Below-average rainfall / drought conditions. ✓ 1 mark: Negative impact on crop yields, livestock, and food security.',
-        marks: 4,
+          'Subsiding air under high pressure suppresses convection and rainfall across Southern Africa during El Niño.',
       },
     ],
   },
 
-  // ============================================================================
-  // GRADE 12 PAPERS (5 SUBJECTS - MATRIC EXAM PREP)
-  // ============================================================================
+  // ==========================================================================
+  // GRADE 12 MATRIC (5 SUBJECTS)
+  // ==========================================================================
   {
-    title: 'Grade 12 Mathematics (Matric): Differential Calculus, Sequences & Financial Maths',
-    description:
-      'NSC Grade 12 Matric Mathematics Paper 1 revision covering arithmetic/geometric series, first principles derivatives, cubic graphs, and annuities.',
-    subject: SubjectCode.MATHEMATICS,
     grade: 12,
-    term: 3,
-    year: 2026,
-    durationMinutes: 60,
-    questions: [
+    subject: SubjectCode.MATHEMATICS,
+    subjectLabel: 'Mathematics',
+    examTitle: 'Grade 12 Matric Mathematics Past Paper 1: Calculus, Sequences, Series & Finance',
+    pastPaperSource: 'DBE NSC Grade 12 Matric November Past Paper 1 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 12 Matric Mathematics Quiz: Derivatives & Convergent Series (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Differential Calculus - Turning Points',
+        topic: 'Differential Calculus - Stationary Points',
         type: QuestionType.NUMERIC,
         prompt:
-          'Given the cubic function f(x) = x³ - 6x² + 9x + 2, calculate the smaller x-coordinate of the stationary (turning) points where f\'(x) = 0.',
+          'For the cubic function f(x) = x³ - 6x² + 9x + 2, calculate the smaller x-coordinate of the turning points where f\'(x) = 0.',
         options: [],
         correctAnswer: '1',
-        rubricKeywords: ['1', '3x^2 - 12x + 9 = 0', '(x - 1)(x - 3) = 0'],
-        explanation:
-          'Step 1: Find the derivative: f\'(x) = 3x² - 12x + 9. Step 2: Set f\'(x) = 0 for stationary points: 3(x² - 4x + 3) = 0 → 3(x - 1)(x - 3) = 0. Step 3: Stationary points are at x = 1 and x = 3. The smaller x-coordinate is 1.',
-        marks: 4,
+        rubricKeywords: ['1', '3x^2 - 12x + 9 = 0'],
+        explanation: 'f\'(x) = 3x² - 12x + 9 = 3(x - 1)(x - 3) = 0. The smaller x-value is 1.',
       },
       {
-        questionNumber: 2,
         topic: 'Convergent Geometric Series',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'For which values of x does the infinite geometric series 2 + 2(x - 1) + 2(x - 1)² + ... converge?',
-        options: [
-          'A) -1 < x < 1',
-          'B) 0 < x < 2',
-          'C) x > 2 or x < 0',
-          'D) -2 < x < 2',
-        ],
+        prompt: 'For which values of x does 2 + 2(x - 1) + 2(x - 1)² + ... converge?',
+        options: ['A) -1 < x < 1', 'B) 0 < x < 2', 'C) x > 2', 'D) -2 < x < 2'],
         correctAnswer: 'B) 0 < x < 2',
         rubricKeywords: ['0 < x < 2', '-1 < r < 1'],
-        explanation:
-          'An infinite geometric series converges when -1 < r < 1. Here the common ratio is r = x - 1. So -1 < x - 1 < 1. Adding 1 to all parts gives 0 < x < 2.',
-        marks: 3,
+        explanation: 'Series converges when -1 < r < 1 → -1 < x - 1 < 1 → 0 < x < 2.',
       },
       {
-        questionNumber: 3,
-        topic: 'Concavity & Point of Inflection',
+        topic: 'Cubic Point of Inflection',
         type: QuestionType.TRUE_FALSE,
-        prompt:
-          'At the point of inflection of a cubic function f(x), the second derivative f\'\'(x) is equal to zero and concavity changes.',
+        prompt: 'At the point of inflection of a cubic graph f(x), the second derivative f\'\'(x) = 0.',
         options: ['True', 'False'],
         correctAnswer: 'True',
-        rubricKeywords: ['True', 'second derivative', 'concavity'],
-        explanation:
-          'True! A cubic graph changes from concave up (f\'\'(x) > 0) to concave down (f\'\'(x) < 0) or vice versa at its unique point of inflection where f\'\'(x) = 0.',
-        marks: 2,
+        rubricKeywords: ['True', 'second derivative'],
+        explanation: 'True! Concavity changes at the point of inflection where f\'\'(x) = 0.',
       },
       {
-        questionNumber: 4,
-        topic: 'Calculus Optimization & Tangent Reasoning',
+        topic: 'Calculus Optimization & Second Derivative Test',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain why we set the first derivative f\'(x) = 0 when finding the maximum volume of a 3D container in a Matric Calculus optimization problem, and how the second derivative test confirms it is a maximum.',
+          'Explain why we set f\'(x) = 0 when finding a maximum in Matric Calculus optimization and how f\'\'(x) confirms a local maximum.',
         options: [],
         correctAnswer:
-          'The first derivative f\'(x) represents the gradient of the tangent (rate of change). At a local maximum turning point, the tangent line is horizontal so its gradient f\'(x) = 0. Using the second derivative test, if f\'\'(x) < 0 (negative), the graph is concave down, confirming the stationary point is a maximum.',
-        rubricKeywords: [
-          'gradient of tangent',
-          'horizontal',
-          'rate of change',
-          'f\'\'(x) < 0',
-          'concave down',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: f\'(x) is the rate of change / gradient of tangent. ✓ 1 mark: At a maximum turning point, the tangent is horizontal (f\'(x) = 0). ✓ 1 mark: Second derivative test checks f\'\'(x) < 0. ✓ 1 mark: f\'\'(x) < 0 means concave down, confirming a local maximum.',
-        marks: 4,
+          'f\'(x) is the rate of change or gradient of the tangent, which is horizontal (0) at a turning point. If f\'\'(x) < 0, the graph is concave down, confirming a local maximum.',
+        rubricKeywords: ['gradient of tangent', 'horizontal', 'rate of change', 'f\'\'(x) < 0', 'concave down'],
+        explanation: 'Horizontal tangent gives f\'(x) = 0, and negative second derivative f\'\'(x) < 0 proves concave-down maximum.',
       },
     ],
   },
   {
-    title: 'Grade 12 Mathematical Literacy (Matric): SARS Income Tax, Loans & Data Handling',
-    description:
-      'NSC Grade 12 Matric Maths Literacy revision covering personal income tax tables, tax rebates, medical tax credits, and box-and-whisker quartiles.',
-    subject: SubjectCode.MATHEMATICAL_LITERACY,
     grade: 12,
-    term: 3,
-    year: 2026,
-    durationMinutes: 50,
-    questions: [
+    subject: SubjectCode.MATHEMATICAL_LITERACY,
+    subjectLabel: 'Mathematical Literacy',
+    examTitle: 'Grade 12 Matric Mathematical Literacy Past Paper: SARS Tax, Loans & Quartiles',
+    pastPaperSource: 'DBE NSC Grade 12 Matric November Past Paper (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 12 Matric Mathematical Literacy Quiz: Tax Rebates & IQR (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Data Handling - Interquartile Range (IQR)',
+        topic: 'Interquartile Range (IQR)',
         type: QuestionType.NUMERIC,
-        prompt:
-          'In a Grade 12 dataset of test scores, the lower quartile (Q₁) is 48 and the upper quartile (Q₃) is 79. Calculate the Interquartile Range (IQR).',
+        prompt: 'Given lower quartile Q₁ = 48 and upper quartile Q₃ = 79, calculate the IQR.',
         options: [],
         correctAnswer: '31',
-        rubricKeywords: ['31', '79 - 48', 'Q3 - Q1'],
-        explanation:
-          'Formula: IQR = Q₃ - Q₁ = 79 - 48 = 31. The middle 50% of learners scored within a range of 31 marks.',
-        marks: 2,
+        rubricKeywords: ['31', '79 - 48'],
+        explanation: 'IQR = Q₃ - Q₁ = 79 - 48 = 31.',
       },
       {
-        questionNumber: 2,
         topic: 'Percentile Interpretation',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'If a Matric learner’s score lies at the 85th percentile of the national cohort, this means:',
+        prompt: 'Scoring at the 85th percentile in a national exam cohort means:',
         options: [
-          'A) The learner achieved 85% on the examination paper',
-          'B) 85% of the learners in the cohort scored equal to or lower than this learner',
-          'C) 85% of the learners scored higher than this learner',
-          'D) The learner answered 85 questions correctly',
+          'A) Scoring 85% on the paper',
+          'B) 85% of candidates scored equal to or lower than this learner',
+          'C) 85% of candidates scored higher',
+          'D) Answering 85 questions',
         ],
-        correctAnswer:
-          'B) 85% of the learners in the cohort scored equal to or lower than this learner',
-        rubricKeywords: ['85% of the learners', 'lower', '15%'],
-        explanation:
-          'The 85th percentile means the learner performed better than or equal to 85% of all candidates (and only 15% of candidates scored higher).',
-        marks: 2,
+        correctAnswer: 'B) 85% of candidates scored equal to or lower than this learner',
+        rubricKeywords: ['85% of candidates', 'lower'],
+        explanation: '85th percentile means performing better than or equal to 85% of the group.',
       },
       {
-        questionNumber: 3,
-        topic: 'SARS Personal Income Tax & Rebates',
+        topic: 'SARS Tax Deductions vs Tax Rebates',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain the difference between a tax deduction (such as pension fund contributions) and a tax rebate (such as the primary rebate) when calculating a taxpayer’s annual SARS income tax.',
+          'Explain the difference between a tax deduction (such as pension contributions) and a tax rebate when calculating annual SARS income tax.',
         options: [],
         correctAnswer:
-          'A tax deduction (like pension contributions) is subtracted from gross income before looking up the tax bracket to reduce taxable income. A tax rebate is a fixed Rand amount subtracted directly from the calculated tax payable after using the tax bracket formula.',
-        rubricKeywords: [
-          'taxable income',
-          'subtracted from gross income',
-          'before tax bracket',
-          'tax rebate',
-          'subtracted from tax payable',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 2 marks: Tax deduction reduces gross income to determine taxable income BEFORE applying the tax table. ✓ 2 marks: Tax rebate is subtracted directly from the calculated tax amount AFTER applying the tax bracket.',
-        marks: 4,
+          'A tax deduction is subtracted from gross income before applying the tax bracket to find taxable income, whereas a tax rebate is subtracted directly from the calculated tax payable.',
+        rubricKeywords: ['taxable income', 'subtracted from gross income', 'before tax bracket', 'tax rebate', 'subtracted from tax payable'],
+        explanation: 'Deductions lower taxable income before bracket lookup; rebates reduce tax payable afterwards.',
       },
     ],
   },
   {
-    title: 'Grade 12 Physical Sciences (Matric): Momentum, Work-Energy, Doppler & Electrochemistry',
-    description:
-      'NSC Grade 12 Matric Physical Sciences revision covering conservation of linear momentum, Work-Energy Theorem, Doppler Effect, and galvanic/electrolytic cells.',
-    subject: SubjectCode.PHYSICAL_SCIENCES,
     grade: 12,
-    term: 3,
-    year: 2026,
-    durationMinutes: 60,
-    questions: [
+    subject: SubjectCode.PHYSICAL_SCIENCES,
+    subjectLabel: 'Physical Sciences',
+    examTitle: 'Grade 12 Matric Physical Sciences Past Paper: Momentum, Doppler & Chemical Equilibrium',
+    pastPaperSource: 'DBE NSC Grade 12 Matric November Past Paper 1 & 2 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 12 Matric Physical Sciences Quiz: Impulse, Doppler & Le Chatelier (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
         topic: 'Impulse & Change in Momentum',
         type: QuestionType.NUMERIC,
         prompt:
-          'A 0.5 kg soccer ball moving east at 10 m/s is kicked so that it moves west at 14 m/s. Calculate the magnitude of the impulse (in N·s) exerted on the ball.',
+          'A 0.5 kg ball moving east at 10 m/s is kicked so it moves west at 14 m/s. Calculate the magnitude of the impulse in N·s.',
         options: [],
         correctAnswer: '12',
-        rubricKeywords: ['12', '0.5(-14 - 10)', 'm(vf - vi)'],
-        explanation:
-          'Take East as positive (+10 m/s) and West as negative (-14 m/s). Impulse = Δp = m(v_f - v_i) = 0.5 × (-14 - 10) = 0.5 × (-24) = -12 N·s. The magnitude of the impulse is 12 N·s.',
-        marks: 4,
+        rubricKeywords: ['12', '0.5(-14 - 10)'],
+        explanation: 'Δp = m(v_f - v_i) = 0.5(-14 - 10) = -12 N·s. Magnitude = 12 N·s.',
       },
       {
-        questionNumber: 2,
-        topic: 'Doppler Effect & Red Shift',
+        topic: 'Doppler Effect Receding Source',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'When an ambulance with a blaring siren moves rapidly AWAY from a stationary listener, how do the observed frequency and wavelength compare to the emitted sound?',
+        prompt: 'When a siren moves AWAY from a stationary listener, the observed sound has:',
         options: [
-          'A) Observed frequency is higher and wavelength is shorter',
-          'B) Observed frequency is lower and wavelength is longer',
-          'C) Observed frequency is lower and wavelength is shorter',
-          'D) Both frequency and wavelength remain unchanged',
+          'A) Higher frequency and shorter wavelength',
+          'B) Lower frequency and longer wavelength',
+          'C) Lower frequency and shorter wavelength',
+          'D) Unchanged frequency',
         ],
-        correctAnswer: 'B) Observed frequency is lower and wavelength is longer',
-        rubricKeywords: ['frequency is lower', 'wavelength is longer'],
-        explanation:
-          'As the sound source recedes from the observer, wave fronts are stretched apart (longer wavelength λ), resulting in fewer wave crests reaching the ear per second (lower observed frequency f_L < f_S).',
-        marks: 2,
+        correctAnswer: 'B) Lower frequency and longer wavelength',
+        rubricKeywords: ['Lower frequency', 'longer wavelength'],
+        explanation: 'Receding wave fronts stretch out (longer λ), lowering observed frequency.',
       },
       {
-        questionNumber: 3,
-        topic: 'Chemical Equilibrium & Le Chatelier’s Principle',
+        topic: 'Le Chatelier’s Principle - Haber Process',
         type: QuestionType.EXPLAIN,
         prompt:
-          'In the exothermic Haber process N₂(g) + 3H₂(g) ⇌ 2NH₃(g) (ΔH < 0), explain using Le Chatelier’s Principle how increasing the pressure (by decreasing volume) affects the equilibrium yield of ammonia (NH₃).',
+          'In N₂(g) + 3H₂(g) ⇌ 2NH₃(g), explain using Le Chatelier’s Principle how increasing pressure affects the equilibrium yield of NH₃.',
         options: [],
         correctAnswer:
-          'By Le Chatelier’s Principle, increasing the pressure disturbs the equilibrium, so the system shifts to decrease the pressure by favouring the side with fewer moles of gas. There are 4 moles of gas on the left (1 N₂ + 3 H₂) and 2 moles of gas on the right (2 NH₃). Therefore the forward reaction is favoured and the yield of ammonia increases.',
-        rubricKeywords: [
-          'Le Chatelier',
-          'fewer moles of gas',
-          '4 moles',
-          '2 moles',
-          'forward reaction favoured',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: System opposes the increase in pressure by favouring the side with fewer gas moles. ✓ 1 mark: Compare 4 moles of reactant gas vs 2 moles of product gas. ✓ 1 mark: Forward reaction is favoured. ✓ 1 mark: Equilibrium yield of NH₃ increases.',
-        marks: 4,
+          'By Le Chatelier’s Principle, increasing pressure favours the side with fewer moles of gas. There are 4 moles of gas on the left and 2 moles on the right, so the forward reaction is favoured and NH₃ yield increases.',
+        rubricKeywords: ['Le Chatelier', 'fewer moles of gas', '4 moles', '2 moles', 'forward reaction favoured'],
+        explanation: 'High pressure shifts equilibrium toward 2 moles of product gas vs 4 moles of reactant gas.',
       },
     ],
   },
   {
-    title: 'Grade 12 Life Sciences (Matric): DNA, Protein Synthesis, Meiosis, Genetics & Evolution',
-    description:
-      'NSC Grade 12 Matric Life Sciences revision covering DNA replication, transcription/translation, crossing over in meiosis, genetics crosses, and natural selection.',
-    subject: SubjectCode.LIFE_SCIENCES,
     grade: 12,
-    term: 3,
-    year: 2026,
-    durationMinutes: 55,
-    questions: [
+    subject: SubjectCode.LIFE_SCIENCES,
+    subjectLabel: 'Life Sciences',
+    examTitle: 'Grade 12 Matric Life Sciences Past Paper: DNA, Protein Synthesis, Meiosis & Genetics',
+    pastPaperSource: 'DBE NSC Grade 12 Matric November Past Paper 1 & 2 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 12 Matric Life Sciences Quiz: Transcription, Translation & Meiosis (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'DNA Base Pairing & Coding',
+        topic: 'DNA to mRNA Transcription',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'If a DNA template strand has the nitrogenous base triplet TAC, what is the corresponding mRNA codon formed during transcription?',
+        prompt: 'If a DNA template triplet is TAC, what is the complementary mRNA codon?',
         options: ['A) ATG', 'B) AUG', 'C) UAC', 'D) GUA'],
         correctAnswer: 'B) AUG',
-        rubricKeywords: ['AUG', 'Uracil'],
-        explanation:
-          'In RNA, Adenine (A) pairs with Uracil (U) instead of Thymine (T), and Cytosine (C) pairs with Guanine (G). Thus DNA triplet T-A-C transcribes into mRNA codon A-U-G.',
-        marks: 2,
+        rubricKeywords: ['AUG'],
+        explanation: 'T pairs with A, A pairs with U (in RNA), and C pairs with G → AUG.',
       },
       {
-        questionNumber: 2,
-        topic: 'Meiosis & Chromosome Number',
+        topic: 'Meiosis Haploid Gametes',
         type: QuestionType.NUMERIC,
         prompt:
-          'A human somatic (body) cell contains 46 chromosomes. How many chromosomes will be present in a normal human gamete (sperm or ovum) produced at the end of Meiosis II?',
+          'A human body cell has 46 chromosomes. How many chromosomes are in a human gamete after Meiosis II?',
         options: [],
         correctAnswer: '23',
         rubricKeywords: ['23', 'haploid'],
-        explanation:
-          'Meiosis is a reduction division that halves the diploid chromosome number (2n = 46) to produce haploid gametes (n = 23).',
-        marks: 2,
+        explanation: 'Meiosis halves the chromosome number from 46 (2n) to 23 (n).',
       },
       {
-        questionNumber: 3,
-        topic: 'Protein Synthesis - Transcription vs Translation',
+        topic: 'Protein Synthesis - Translation at Ribosome',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Describe the role of mRNA and tRNA during the translation stage of protein synthesis at the ribosome.',
+          'Describe the roles of mRNA and tRNA during the translation stage of protein synthesis.',
         options: [],
         correctAnswer:
-          'mRNA attaches to the ribosome and provides the sequence of codons that specifies the order of amino acids. tRNA molecules carry specific amino acids from the cytoplasm to the ribosome; each tRNA has a complementary anticodon that pairs with the matching mRNA codon so amino acids join by peptide bonds to form a polypeptide protein.',
-        rubricKeywords: [
-          'ribosome',
-          'codons',
-          'anticodon',
-          'amino acids',
-          'peptide bonds',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: mRNA carries codons and binds to the ribosome. ✓ 1 mark: tRNA brings specific amino acids to the ribosome. ✓ 1 mark: tRNA anticodon complementary base-pairs with mRNA codon. ✓ 1 mark: Amino acids link via peptide bonds to form a protein.',
-        marks: 4,
+          'mRNA binds to the ribosome and provides codons specifying the amino acid sequence. tRNA carries specific amino acids to the ribosome with complementary anticodons that pair with mRNA codons so amino acids link by peptide bonds.',
+        rubricKeywords: ['ribosome', 'codons', 'anticodon', 'amino acids', 'peptide bonds'],
+        explanation: 'mRNA codons pair with tRNA anticodons at the ribosome to join amino acids via peptide bonds.',
       },
     ],
   },
   {
-    title: 'Grade 12 Geography (Matric): Mid-Latitude Cyclones, Fluvial Geomorphology & Urban Settlement',
-    description:
-      'NSC Grade 12 Matric Geography revision covering cold fronts, tropical cyclones, river capture (stream piracy), drainage density, and urban land-use zones.',
-    subject: SubjectCode.GEOGRAPHY,
     grade: 12,
-    term: 3,
-    year: 2026,
-    durationMinutes: 55,
-    questions: [
+    subject: SubjectCode.GEOGRAPHY,
+    subjectLabel: 'Geography',
+    examTitle: 'Grade 12 Matric Geography Past Paper: Cyclones, River Capture & Urban Settlements',
+    pastPaperSource: 'DBE NSC Grade 12 Matric November Past Paper 1 (150 Marks · 10 Questions)',
+    quizTitle: 'Grade 12 Matric Geography Quiz: Cold Fronts, Tropical Cyclones & Fluvial Processes (100 Marks)',
+    coreQuestions: [
       {
-        questionNumber: 1,
-        topic: 'Mid-Latitude Cyclones & Cold Fronts',
+        topic: 'Mid-Latitude Cyclone Cold Front',
         type: QuestionType.MULTIPLE_CHOICE,
-        prompt:
-          'Which cloud type and weather change are typically experienced in Cape Town as the cold front of a mid-latitude cyclone passes over?',
+        prompt: 'Which weather changes occur as a cold front passes over Cape Town?',
         options: [
-          'A) Cirrus clouds, rising temperatures, and calm winds',
+          'A) Cirrus clouds and rising temperatures',
           'B) Cumulonimbus clouds, sudden drop in temperature, heavy rain, and wind backing',
-          'C) Stratus clouds, tropical heatwave, and zero humidity',
-          'D) Clear skies due to strong subsidence from the Kalahari High',
+          'C) Clear skies and zero humidity',
+          'D) Tropical cyclone eye subsidence',
         ],
         correctAnswer:
           'B) Cumulonimbus clouds, sudden drop in temperature, heavy rain, and wind backing',
         rubricKeywords: ['Cumulonimbus', 'drop in temperature', 'backing'],
-        explanation:
-          'Dense cold air undercuts warm air sharply along the steep cold front, causing rapid uplift, cumulonimbus clouds, heavy showers, a sudden drop in temperature, rising pressure, and wind backing from NW to SW.',
-        marks: 2,
+        explanation: 'Cold air uplifts warm air rapidly into cumulonimbus clouds with heavy rain and wind backing.',
       },
       {
-        questionNumber: 2,
-        topic: 'Tropical Cyclone Naming & Eye',
+        topic: 'Tropical Cyclone Eye Conditions',
         type: QuestionType.TRUE_FALSE,
-        prompt:
-          'At the centre (eye) of a mature tropical cyclone, weather conditions are calm, cloudless, and warm due to descending air.',
+        prompt: 'In the eye of a mature tropical cyclone, conditions are calm and cloudless due to descending air.',
         options: ['True', 'False'],
         correctAnswer: 'True',
-        rubricKeywords: ['True', 'eye', 'descending air'],
-        explanation:
-          'True! While the eyewall has violent winds and torrential rain, the eye itself has subsiding (sinking) air which warms adiabatically, producing calm, clear conditions.',
-        marks: 2,
+        rubricKeywords: ['True', 'descending air'],
+        explanation: 'True! Subsiding air in the eye warms adiabatically and prevents cloud formation.',
       },
       {
-        questionNumber: 3,
-        topic: 'Fluvial Geomorphology - River Capture (Stream Piracy)',
+        topic: 'River Capture (Stream Piracy)',
         type: QuestionType.EXPLAIN,
         prompt:
-          'Explain how headward erosion leads to river capture (stream piracy), and name the resulting features formed at the point of capture and in the deprived stream.',
+          'Explain how headward erosion causes river capture and name the landforms created at the capture point.',
         options: [],
         correctAnswer:
-          'An energetic captor stream flowing at a lower altitude or over softer rock erodes backwards (headward erosion) through the watershed until it intercepts and diverts the headwaters of a less energetic river. This forms an elbow of capture at the point of diversion, a dry wind gap below the elbow, and leaves the lower course as a misfit (underfit) stream.',
-        rubricKeywords: [
-          'headward erosion',
-          'watershed',
-          'elbow of capture',
-          'wind gap',
-          'misfit stream',
-        ],
-        explanation:
-          'Marking Rubric (4 marks): ✓ 1 mark: Energetic captor stream erodes backwards through watershed via headward erosion. ✓ 1 mark: Diverts water from the captured river. ✓ 1 mark: Identifies elbow of capture and wind gap. ✓ 1 mark: Identifies misfit (underfit) stream.',
-        marks: 4,
+          'An energetic captor stream erodes backwards through the watershed via headward erosion and diverts the headwaters of another river, forming an elbow of capture, a dry wind gap, and leaving a misfit stream.',
+        rubricKeywords: ['headward erosion', 'watershed', 'elbow of capture', 'wind gap', 'misfit stream'],
+        explanation: 'Headward erosion breaches the watershed, creating an elbow of capture, wind gap, and misfit stream.',
       },
     ],
   },
 ];
 
 async function main() {
-  console.log('Seeding Academic Exam Prep Database (Grades 10, 11, 12)...');
+  console.log('Seeding Grade 10–12 Past Paper Exams (150 Marks · 10 Qs) & Quizzes (100 Marks · 10 Qs)...');
 
   const adminPasswordHash = await bcrypt.hash('Admin123!', 10);
   const userPasswordHash = await bcrypt.hash('User123!', 10);
 
-  // 1. Create Admin & Learner Accounts across Grades 10, 11, 12
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {
@@ -1083,56 +917,99 @@ async function main() {
     },
   });
 
-  // 2. Seed Exam Papers if not already present
-  const existingPapersCount = await prisma.examPaper.count();
-  if (existingPapersCount === 0) {
-    for (const paperData of EXAM_PAPERS_SEED) {
-      const totalMarks = paperData.questions.reduce((s, q) => s + q.marks, 0);
+  // Seed 15 Past Paper EXAMS (150 Marks · 10 Questions each) + 15 Revision QUIZZES (100 Marks · 10 Questions each)
+  const existingCount = await prisma.examPaper.count();
+  if (existingCount === 0) {
+    for (const item of CURRICULUM_DATA) {
+      const tenQuestions = build10Questions(
+        item.coreQuestions,
+        item.grade,
+        item.subjectLabel
+      );
+
+      // 1. Create the 150-Mark Past Paper EXAM (10 questions × 15 marks = 150 marks)
       await prisma.examPaper.create({
         data: {
-          title: paperData.title,
-          description: paperData.description,
-          subject: paperData.subject,
-          grade: paperData.grade,
-          term: paperData.term,
-          year: paperData.year,
-          durationMinutes: paperData.durationMinutes,
-          totalMarks,
+          title: item.examTitle,
+          description: `Official Grade ${item.grade} ${item.subjectLabel} Past Paper Examination - 10 structured past-paper questions totaling 150 Marks.`,
+          subject: item.subject,
+          assessmentType: AssessmentType.EXAM,
+          pastPaperSource: item.pastPaperSource,
+          grade: item.grade,
+          term: 4,
+          year: 2026,
+          durationMinutes: 150,
+          totalMarks: 150,
           isPublished: true,
           createdById: admin.id,
           questions: {
-            create: paperData.questions,
+            create: tenQuestions.map((q, idx) => ({
+              questionNumber: idx + 1,
+              topic: q.topic,
+              type: q.type,
+              prompt: q.prompt,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+              rubricKeywords: q.rubricKeywords,
+              explanation: q.explanation,
+              marks: 15, // 10 questions × 15 marks = 150 marks
+            })),
+          },
+        },
+      });
+
+      // 2. Create the 100-Mark Revision QUIZ (10 questions × 10 marks = 100 marks)
+      await prisma.examPaper.create({
+        data: {
+          title: item.quizTitle,
+          description: `Grade ${item.grade} ${item.subjectLabel} Interactive Revision Quiz - 10 core questions totaling 100 Marks.`,
+          subject: item.subject,
+          assessmentType: AssessmentType.QUIZ,
+          pastPaperSource: `CAPS Grade ${item.grade} ${item.subjectLabel} Quiz Bank (100 Marks)`,
+          grade: item.grade,
+          term: 2,
+          year: 2026,
+          durationMinutes: 60,
+          totalMarks: 100,
+          isPublished: true,
+          createdById: admin.id,
+          questions: {
+            create: tenQuestions.map((q, idx) => ({
+              questionNumber: idx + 1,
+              topic: q.topic,
+              type: q.type,
+              prompt: q.prompt,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+              rubricKeywords: q.rubricKeywords,
+              explanation: q.explanation,
+              marks: 10, // 10 questions × 10 marks = 100 marks
+            })),
           },
         },
       });
     }
-    console.log(`Seeded ${EXAM_PAPERS_SEED.length} Exam Prep Papers across Grades 10, 11, and 12!`);
   }
 
-  // 3. Seed Realistic Exam Attempts for Learners so Admin Dashboard has rich progress telemetry
-  const existingAttemptsCount = await prisma.examAttempt.count();
-  if (existingAttemptsCount === 0) {
+  // Seed sample graded attempts on both 150-mark Exams and 100-mark Quizzes
+  const existingAttempts = await prisma.examAttempt.count();
+  if (existingAttempts === 0) {
     const allPapers = await prisma.examPaper.findMany({
       include: { questions: true },
     });
 
-    async function createSampleAttempt(
+    async function seedAttempt(
       learnerId: string,
       paper: (typeof allPapers)[0],
       timeSpentSeconds: number,
-      teacherFeedback?: string
+      feedback?: string
     ) {
       let scoreEarned = 0;
       let totalMarks = 0;
 
       const answersPayload = paper.questions.map((q, idx) => {
-        // Simulate high-quality answers on most questions and partial on the last one
         const answerText =
-          idx === paper.questions.length - 1 && q.type === QuestionType.EXPLAIN
-            ? q.rubricKeywords.slice(0, Math.ceil(q.rubricKeywords.length * 0.75)).join(', ') +
-              ' as explained in the topic.'
-            : q.correctAnswer;
-
+          idx === 9 ? '' : q.correctAnswer; // 9 out of 10 right = 90%
         const graded = gradeStudentAnswer(q, answerText);
         scoreEarned += graded.marksEarned;
         totalMarks += graded.maxMarks;
@@ -1157,75 +1034,78 @@ async function main() {
         data: {
           userId: learnerId,
           examPaperId: paper.id,
-          mode: 'REVISION',
+          mode: paper.assessmentType,
           scoreEarned,
           totalMarks,
           percentage,
           gradeSymbol: calculateAchievementLevel(percentage),
           timeSpentSeconds,
-          teacherFeedback: teacherFeedback || null,
-          answers: {
-            create: answersPayload,
-          },
+          teacherFeedback: feedback || null,
+          answers: { create: answersPayload },
         },
       });
     }
 
-    const g10Math = allPapers.find(
-      (p) => p.grade === 10 && p.subject === SubjectCode.MATHEMATICS
+    const g10Exam = allPapers.find(
+      (p) =>
+        p.grade === 10 &&
+        p.subject === SubjectCode.MATHEMATICS &&
+        p.assessmentType === AssessmentType.EXAM
     );
-    const g10Phys = allPapers.find(
-      (p) => p.grade === 10 && p.subject === SubjectCode.PHYSICAL_SCIENCES
+    const g10Quiz = allPapers.find(
+      (p) =>
+        p.grade === 10 &&
+        p.subject === SubjectCode.PHYSICAL_SCIENCES &&
+        p.assessmentType === AssessmentType.QUIZ
     );
-    const g11Math = allPapers.find(
-      (p) => p.grade === 11 && p.subject === SubjectCode.MATHEMATICS
+    const g11Exam = allPapers.find(
+      (p) =>
+        p.grade === 11 &&
+        p.subject === SubjectCode.MATHEMATICS &&
+        p.assessmentType === AssessmentType.EXAM
     );
-    const g11Life = allPapers.find(
-      (p) => p.grade === 11 && p.subject === SubjectCode.LIFE_SCIENCES
-    );
-    const g12Math = allPapers.find(
-      (p) => p.grade === 12 && p.subject === SubjectCode.MATHEMATICS
-    );
-    const g12Geog = allPapers.find(
-      (p) => p.grade === 12 && p.subject === SubjectCode.GEOGRAPHY
+    const g12Exam = allPapers.find(
+      (p) =>
+        p.grade === 12 &&
+        p.subject === SubjectCode.MATHEMATICS &&
+        p.assessmentType === AssessmentType.EXAM
     );
 
-    if (g10Math) {
-      await createSampleAttempt(
+    if (g10Exam) {
+      await seedAttempt(
         grade10Learner.id,
-        g10Math,
-        940,
-        'Great factorisation and exponent work! Review the perpendicular gradient proof for full marks.'
+        g10Exam,
+        3200,
+        'Excellent 135/150 on the Grade 10 Mathematics Past Paper!'
       );
     }
-    if (g10Phys) {
-      await createSampleAttempt(grade10Learner.id, g10Phys, 820);
+    if (g10Quiz) {
+      await seedAttempt(
+        grade10Learner.id,
+        g10Quiz,
+        1400,
+        'Strong 90/100 on the Physical Sciences Quiz!'
+      );
     }
-    if (g11Math) {
-      await createSampleAttempt(
+    if (g11Exam) {
+      await seedAttempt(
         grade11Learner.id,
-        g11Math,
-        1120,
-        'Strong Euclidean geometry and discriminant reasoning.'
+        g11Exam,
+        3600,
+        'Great performance (135/150) on Grade 11 Maths Past Paper!'
       );
     }
-    if (g11Life) {
-      await createSampleAttempt(grade11Learner.id, g11Life, 780);
-    }
-    if (g12Math) {
-      await createSampleAttempt(
+    if (g12Exam) {
+      await seedAttempt(
         grade12Learner.id,
-        g12Math,
-        1450,
-        'Excellent Matric Calculus readiness! Keep practicing optimization proofs.'
+        g12Exam,
+        4100,
+        'Outstanding Matric readiness (135/150) on Past Paper 1!'
       );
-    }
-    if (g12Geog) {
-      await createSampleAttempt(grade12Learner.id, g12Geog, 1050);
     }
   }
 
-  console.log('Academic seed completed successfully!');
+  console.log('Seeded 15 Past Paper Exams (150 Marks, 10 Qs) + 15 Quizzes (100 Marks, 10 Qs)!');
 }
 
 main()

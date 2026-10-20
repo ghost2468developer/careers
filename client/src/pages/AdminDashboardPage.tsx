@@ -22,11 +22,14 @@ import {
   X,
   Plus,
   GraduationCap,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import {
   ADMIN_OPERATIONS,
   AdminLearnerProgress,
   AdminStats,
+  AssessmentType,
   AuditLog,
   ExamAttempt,
   ExamPaper,
@@ -54,6 +57,119 @@ interface DraftQuestion {
   marks: number;
 }
 
+function generate10DefaultQuestions(
+  assessmentType: AssessmentType,
+  grade: number,
+  subject: SubjectCode
+): DraftQuestion[] {
+  const subjectLabel = SUBJECT_METADATA[subject].label;
+  const marksPerQuestion = assessmentType === 'EXAM' ? 15 : 10;
+
+  const templates: Array<Omit<DraftQuestion, 'questionNumber' | 'marks'>> = [
+    {
+      topic: `${subjectLabel} - Multiple Choice Concept`,
+      type: 'MULTIPLE_CHOICE',
+      prompt: `[Past Paper Q1 · Grade ${grade} ${subjectLabel}] Which option represents the correct governing relationship for this topic?`,
+      optionsText: `A) Incorrect boundary assumption\nB) Standard Grade ${grade} ${subjectLabel} law and formula\nC) Omitting constant terms\nD) Inverse approximation`,
+      correctAnswer: `B) Standard Grade ${grade} ${subjectLabel} law and formula`,
+      rubricKeywordsText: 'formula, standard law',
+      explanation: `Apply the standard Grade ${grade} ${subjectLabel} definition and verify units before selecting B.`,
+    },
+    {
+      topic: `${subjectLabel} - Quantitative Calculation`,
+      type: 'NUMERIC',
+      prompt: `[Past Paper Q2 · Grade ${grade} ${subjectLabel}] Solve for x in the past-paper equation: 3x - 9 = 15.`,
+      optionsText: '',
+      correctAnswer: '8',
+      rubricKeywordsText: '8, 3x = 24, 24 / 3',
+      explanation: 'Add 9 to both sides: 3x = 24. Divide by 3: x = 8.',
+    },
+    {
+      topic: `${subjectLabel} - True / False Verification`,
+      type: 'TRUE_FALSE',
+      prompt: `[Past Paper Q3 · Grade ${grade} ${subjectLabel}] Showing formula and substitution steps earns method marks in official CAPS marking memorandums.`,
+      optionsText: '',
+      correctAnswer: 'True',
+      rubricKeywordsText: 'True, method marks',
+      explanation: 'True! Official NSC/CAPS memorandums award method marks for formula and substitution.',
+    },
+    {
+      topic: `${subjectLabel} - Structured Explain Question`,
+      type: 'EXPLAIN',
+      prompt: `[Past Paper Q4 · Grade ${grade} ${subjectLabel}] Explain the underlying principle and step-by-step reasoning required to solve a multi-part problem in this topic.`,
+      optionsText: '',
+      correctAnswer:
+        'State the governing law or definition, write the standard formula, substitute known values with correct SI units, and interpret the final result.',
+      rubricKeywordsText: 'governing law, definition, formula, substitute, units',
+      explanation:
+        'Marking Rubric: ✓ Governing law/definition ✓ Standard formula ✓ Substitution with units ✓ Final interpretation.',
+    },
+    {
+      topic: `${subjectLabel} - Percentage & Rate Calculation`,
+      type: 'NUMERIC',
+      prompt: `[Past Paper Q5 · Grade ${grade} ${subjectLabel}] A measured value increases from 50 to 65. Calculate the percentage increase.`,
+      optionsText: '',
+      correctAnswer: '30',
+      rubricKeywordsText: '30, 15 / 50 * 100',
+      explanation: '((65 - 50) / 50) × 100 = (15 / 50) × 100 = 30%.',
+    },
+    {
+      topic: `${subjectLabel} - Graph & Data Interpretation`,
+      type: 'MULTIPLE_CHOICE',
+      prompt: `[Past Paper Q6 · Grade ${grade} ${subjectLabel}] On which axis is the independent variable plotted in a standard scientific/mathematical graph?`,
+      optionsText:
+        'A) Vertical y-axis\nB) Horizontal x-axis\nC) Diagonal axis\nD) Origin only',
+      correctAnswer: 'B) Horizontal x-axis',
+      rubricKeywordsText: 'Horizontal x-axis',
+      explanation: 'The independent variable is always plotted on the horizontal x-axis.',
+    },
+    {
+      topic: `${subjectLabel} - Proportional Reasoning`,
+      type: 'NUMERIC',
+      prompt: `[Past Paper Q7 · Grade ${grade} ${subjectLabel}] Divide 150 in the ratio 2 : 3 and state the larger share.`,
+      optionsText: '',
+      correctAnswer: '90',
+      rubricKeywordsText: '90, 3/5 * 150',
+      explanation: 'Total parts = 5. Larger share = (3 / 5) × 150 = 90.',
+    },
+    {
+      topic: `${subjectLabel} - Principle Verification`,
+      type: 'TRUE_FALSE',
+      prompt: `[Past Paper Q8 · Grade ${grade} ${subjectLabel}] Keeping unrounded intermediate values until the final step prevents rounding errors.`,
+      optionsText: '',
+      correctAnswer: 'True',
+      rubricKeywordsText: 'True, rounding',
+      explanation: 'True! Always round off only at the final answer (usually to 2 decimal places).',
+    },
+    {
+      topic: `${subjectLabel} - Multi-Step Calculation`,
+      type: 'NUMERIC',
+      prompt: `[Past Paper Q9 · Grade ${grade} ${subjectLabel}] Evaluate 2x² + 5 when x = 3.`,
+      optionsText: '',
+      correctAnswer: '23',
+      rubricKeywordsText: '23, 2(9) + 5',
+      explanation: '2(3)² + 5 = 2(9) + 5 = 18 + 5 = 23.',
+    },
+    {
+      topic: `${subjectLabel} - Comprehensive Synthesis & Explain`,
+      type: 'EXPLAIN',
+      prompt: `[Past Paper Q10 · Grade ${grade} ${subjectLabel}] Explain how two variables in this topic interact when external conditions change, and justify your answer using curriculum terminology.`,
+      optionsText: '',
+      correctAnswer:
+        'When the independent variable increases, the system responds according to the governing law, changing the dependent variable proportionally while conserving total energy/mass.',
+      rubricKeywordsText: 'independent variable, governing law, dependent variable, proportionally, conserving',
+      explanation:
+        'Full marks awarded for linking the independent variable change to the governing law and stating the effect on the dependent variable.',
+    },
+  ];
+
+  return templates.map((t, idx) => ({
+    ...t,
+    questionNumber: idx + 1,
+    marks: marksPerQuestion,
+  }));
+}
+
 export const AdminDashboardPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
@@ -72,7 +188,8 @@ export const AdminDashboardPage: React.FC = () => {
   // Filters
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState<'ALL' | number>('ALL');
-  const [roleFilter, setRoleFilter] = useState<'ALL' | Role>('ALL');
+  const [assessmentFilter, setAssessmentFilter] = useState<'ALL' | AssessmentType>('ALL');
+  const [roleFilter] = useState<'ALL' | Role>('ALL');
 
   // Create User Modal
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
@@ -83,43 +200,26 @@ export const AdminDashboardPage: React.FC = () => {
   const [newGrade, setNewGrade] = useState<number>(10);
   const [creatingUser, setCreatingUser] = useState(false);
 
-  // Create / Upload Exam Paper Studio
+  // Create / Add Exam (150 Marks · 10 Qs) or Quiz (100 Marks · 10 Qs) Studio
   const [showPaperBuilder, setShowPaperBuilder] = useState(false);
-  const [paperTitle, setPaperTitle] = useState('');
-  const [paperDesc, setPaperDesc] = useState('');
+  const [paperAssessmentType, setPaperAssessmentType] = useState<AssessmentType>('EXAM');
+  const [paperTitle, setPaperTitle] = useState(
+    'Grade 10 Mathematics Past Paper 2: Trigonometry, Analytical & Euclidean Geometry'
+  );
+  const [paperDesc, setPaperDesc] = useState(
+    'Official 150-Mark Past Paper Examination consisting of 10 structured questions.'
+  );
+  const [paperSource, setPaperSource] = useState(
+    'DBE NSC November Past Paper (150 Marks · 10 Questions)'
+  );
   const [paperSubject, setPaperSubject] = useState<SubjectCode>('MATHEMATICS');
   const [paperGrade, setPaperGrade] = useState<number>(10);
-  const [paperTerm, setPaperTerm] = useState<number>(2);
-  const [paperDuration, setPaperDuration] = useState<number>(45);
+  const [paperTerm, setPaperTerm] = useState<number>(4);
+  const [paperDuration, setPaperDuration] = useState<number>(150);
   const [paperFileName, setPaperFileName] = useState<string>('');
-  const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([
-    {
-      questionNumber: 1,
-      topic: 'Quadratic Equations',
-      type: 'MULTIPLE_CHOICE',
-      prompt: 'Solve for x if (x - 4)(x + 2) = 0',
-      optionsText: 'A) x = -4 or x = 2\nB) x = 4 or x = -2\nC) x = 4 or x = 2\nD) x = -4 or x = -2',
-      correctAnswer: 'B) x = 4 or x = -2',
-      rubricKeywordsText: 'x = 4, x = -2',
-      explanation:
-        'Using the zero-product property: either x - 4 = 0 (so x = 4) or x + 2 = 0 (so x = -2).',
-      marks: 2,
-    },
-    {
-      questionNumber: 2,
-      topic: 'Conceptual Explanation',
-      type: 'EXPLAIN',
-      prompt:
-        'Explain why dividing any real number by zero is undefined in Mathematics.',
-      optionsText: '',
-      correctAnswer:
-        'Division is the inverse of multiplication. If a / 0 = k, then k × 0 = a, which has no unique solution when a ≠ 0 because any number multiplied by 0 equals 0.',
-      rubricKeywordsText: 'inverse of multiplication, multiplied by 0, no unique solution',
-      explanation:
-        'Marking Rubric (3 marks): ✓ 1 mark: Division is inverse of multiplication. ✓ 1 mark: Any number multiplied by 0 is 0. ✓ 1 mark: Therefore no real value can satisfy k × 0 = a.',
-      marks: 3,
-    },
-  ]);
+  const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>(() =>
+    generate10DefaultQuestions('EXAM', 10, 'MATHEMATICS')
+  );
   const [creatingPaper, setCreatingPaper] = useState(false);
 
   // Script Inspector & Teacher Feedback Modal
@@ -171,6 +271,60 @@ export const AdminDashboardPage: React.FC = () => {
     loadAdminData();
   }, [loadAdminData]);
 
+  const handleSwitchBuilderMode = (nextType: AssessmentType) => {
+    setPaperAssessmentType(nextType);
+    const targetMarksPerQ = nextType === 'EXAM' ? 15 : 10;
+    setPaperDuration(nextType === 'EXAM' ? 150 : 60);
+    setPaperSource(
+      nextType === 'EXAM'
+        ? `DBE NSC Grade ${paperGrade} Past Paper (150 Marks · 10 Questions)`
+        : `CAPS Grade ${paperGrade} Revision Quiz (100 Marks · 10 Questions)`
+    );
+    setPaperTitle(
+      nextType === 'EXAM'
+        ? `Grade ${paperGrade} ${SUBJECT_METADATA[paperSubject].label} Past Paper Exam (150 Marks)`
+        : `Grade ${paperGrade} ${SUBJECT_METADATA[paperSubject].label} Revision Quiz (100 Marks)`
+    );
+
+    // Ensure 10 questions and update marks to 15 (Exam = 150) or 10 (Quiz = 100)
+    const tenQs =
+      draftQuestions.length === 10
+        ? draftQuestions.map((q, i) => ({
+            ...q,
+            questionNumber: i + 1,
+            marks: targetMarksPerQ,
+          }))
+        : generate10DefaultQuestions(nextType, paperGrade, paperSubject);
+    setDraftQuestions(tenQs);
+  };
+
+  const handleAutoBalanceMarks = () => {
+    const targetTotal = paperAssessmentType === 'EXAM' ? 150 : 100;
+    const tenQs =
+      draftQuestions.length === 10
+        ? [...draftQuestions]
+        : generate10DefaultQuestions(paperAssessmentType, paperGrade, paperSubject);
+    const perQ = targetTotal / 10;
+    setDraftQuestions(
+      tenQs.map((q, idx) => ({
+        ...q,
+        questionNumber: idx + 1,
+        marks: perQ,
+      }))
+    );
+  };
+
+  const handleLoad10PastPaperTemplate = () => {
+    setDraftQuestions(
+      generate10DefaultQuestions(paperAssessmentType, paperGrade, paperSubject)
+    );
+    setPaperTitle(
+      paperAssessmentType === 'EXAM'
+        ? `Grade ${paperGrade} ${SUBJECT_METADATA[paperSubject].label} National Past Paper (150 Marks)`
+        : `Grade ${paperGrade} ${SUBJECT_METADATA[paperSubject].label} Mastery Quiz (100 Marks)`
+    );
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -178,17 +332,17 @@ export const AdminDashboardPage: React.FC = () => {
 
     try {
       const text = await file.text();
-      // If JSON file with questions array, parse directly
       if (file.name.endsWith('.json')) {
         const parsed = JSON.parse(text);
         if (parsed.title) setPaperTitle(parsed.title);
         if (parsed.description) setPaperDesc(parsed.description);
-        if (Array.isArray(parsed.questions)) {
+        if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+          const defaultMark = paperAssessmentType === 'EXAM' ? 15 : 10;
           setDraftQuestions(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            parsed.questions.map((q: any, idx: number) => ({
+            parsed.questions.slice(0, 10).map((q: any, idx: number) => ({
               questionNumber: idx + 1,
-              topic: q.topic || 'Uploaded Topic',
+              topic: q.topic || 'Past Paper Topic',
               type: q.type || 'EXPLAIN',
               prompt: q.prompt || '',
               optionsText: Array.isArray(q.options) ? q.options.join('\n') : '',
@@ -197,20 +351,16 @@ export const AdminDashboardPage: React.FC = () => {
                 ? q.rubricKeywords.join(', ')
                 : '',
               explanation: q.explanation || '',
-              marks: Number(q.marks) || 3,
+              marks: Number(q.marks) || defaultMark,
             }))
           );
         }
       } else {
-        // Parse text blocks separated by double newlines or Q1/Q2
-        if (!paperTitle) {
-          setPaperTitle(file.name.replace(/\.[^/.]+$/, ''));
-        }
-        setPaperDesc(`Uploaded exam paper from ${file.name}`);
+        setPaperTitle(file.name.replace(/\.[^/.]+$/, ''));
       }
       setBanner({
         type: 'success',
-        text: `Loaded exam paper file "${file.name}". Review the extracted questions below and click Publish!`,
+        text: `Loaded "${file.name}". Review the 10 questions below and click Publish!`,
       });
     } catch {
       setBanner({
@@ -220,23 +370,6 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const handleAddDraftQuestion = () => {
-    setDraftQuestions((prev) => [
-      ...prev,
-      {
-        questionNumber: prev.length + 1,
-        topic: 'Core Topic',
-        type: 'EXPLAIN',
-        prompt: '',
-        optionsText: '',
-        correctAnswer: '',
-        rubricKeywordsText: '',
-        explanation: '',
-        marks: 3,
-      },
-    ]);
-  };
-
   const handleUpdateDraftQuestion = (
     idx: number,
     field: keyof DraftQuestion,
@@ -244,15 +377,6 @@ export const AdminDashboardPage: React.FC = () => {
   ) => {
     setDraftQuestions((prev) =>
       prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q))
-    );
-  };
-
-  const handleRemoveDraftQuestion = (idx: number) => {
-    if (draftQuestions.length <= 1) return;
-    setDraftQuestions((prev) =>
-      prev
-        .filter((_, i) => i !== idx)
-        .map((q, i) => ({ ...q, questionNumber: i + 1 }))
     );
   };
 
@@ -282,7 +406,7 @@ export const AdminDashboardPage: React.FC = () => {
           .map((s) => s.trim())
           .filter(Boolean),
         explanation: q.explanation.trim(),
-        marks: Number(q.marks) || 2,
+        marks: Number(q.marks) || (paperAssessmentType === 'EXAM' ? 15 : 10),
       }));
 
       const data = await graphqlRequest<{ adminCreateExamPaper: ExamPaper }>(
@@ -290,8 +414,10 @@ export const AdminDashboardPage: React.FC = () => {
         {
           input: {
             title: paperTitle,
-            description: paperDesc || `Grade ${paperGrade} Exam Preparation Paper`,
+            description: paperDesc,
             subject: paperSubject,
+            assessmentType: paperAssessmentType,
+            pastPaperSource: paperSource,
             grade: paperGrade,
             term: paperTerm,
             year: 2026,
@@ -306,18 +432,18 @@ export const AdminDashboardPage: React.FC = () => {
         type: 'success',
         text: `Published Grade ${data.adminCreateExamPaper.grade} ${
           SUBJECT_METADATA[data.adminCreateExamPaper.subject].label
-        } paper: "${data.adminCreateExamPaper.title}" (${
-          data.adminCreateExamPaper.questionCount
-        } questions, ${data.adminCreateExamPaper.totalMarks} marks)`,
+        } ${data.adminCreateExamPaper.assessmentType}: "${
+          data.adminCreateExamPaper.title
+        }" (${data.adminCreateExamPaper.questionCount} Questions · ${
+          data.adminCreateExamPaper.totalMarks
+        } Marks)`,
       });
       setShowPaperBuilder(false);
-      setPaperTitle('');
-      setPaperDesc('');
       await loadAdminData();
     } catch (err) {
       setBanner({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Failed to publish exam paper',
+        text: err instanceof Error ? err.message : 'Failed to publish assessment',
       });
     } finally {
       setCreatingPaper(false);
@@ -330,7 +456,7 @@ export const AdminDashboardPage: React.FC = () => {
       await graphqlRequest(ADMIN_OPERATIONS.DELETE_EXAM_PAPER, { id: paper.id });
       setBanner({
         type: 'success',
-        text: `Deleted exam paper "${paper.title}"`,
+        text: `Deleted ${paper.assessmentType} "${paper.title}"`,
       });
       await loadAdminData();
     } catch (err) {
@@ -517,6 +643,15 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const currentDraftTotalMarks = draftQuestions.reduce(
+    (sum, q) => sum + (Number(q.marks) || 0),
+    0
+  );
+  const requiredMarks = paperAssessmentType === 'EXAM' ? 150 : 100;
+  const filteredPapers = examPapers.filter((p) =>
+    assessmentFilter === 'ALL' ? true : p.assessmentType === assessmentFilter
+  );
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
       {/* Top Admin Header */}
@@ -527,15 +662,12 @@ export const AdminDashboardPage: React.FC = () => {
               <ShieldCheck className="h-3.5 w-3.5" />
               ADMIN ACADEMIC COMMAND CENTER
             </span>
-            <code className="rounded bg-slate-950/90 px-2 py-0.5 text-[11px] text-sky-300 border border-slate-800">
-              src/components/admin/&#123;schema.graphql.ts, resolvers.ts&#125;
-            </code>
           </div>
           <h1 className="mt-2 text-2xl font-bold text-white">
-            Grade 10–12 Learner Progress, Exam Papers & Grading Monitor
+            Grade 10–12 Learner Monitoring, 150-Mark Exams & 100-Mark Quizzes
           </h1>
           <p className="mt-0.5 text-xs text-slate-400">
-            Monitor learner performance across Grade 10, 11, and 12, inspect exam scripts, and upload/build new exam papers.
+            Create 150-Mark Past Paper Exams (10 Questions) & 100-Mark Quizzes, and monitor every learner&apos;s progress across Grades 10, 11, and 12.
           </p>
         </div>
 
@@ -551,17 +683,30 @@ export const AdminDashboardPage: React.FC = () => {
           <button
             onClick={() => {
               setActiveTab('papers');
-              setShowPaperBuilder(!showPaperBuilder);
+              handleSwitchBuilderMode('EXAM');
+              setShowPaperBuilder(true);
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-600/25 hover:bg-emerald-500"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-500"
           >
-            <Upload className="h-4 w-4" />
-            Upload / Create Exam Paper
+            <Plus className="h-4 w-4" />
+            Create 150-Mark Exam (10 Qs)
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('papers');
+              handleSwitchBuilderMode('QUIZ');
+              setShowPaperBuilder(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/25 hover:bg-emerald-500"
+          >
+            <Zap className="h-4 w-4" />
+            Create 100-Mark Quiz
           </button>
 
           <button
             onClick={() => setShowCreateUserModal(!showCreateUserModal)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-500"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-700"
           >
             <UserPlus className="h-4 w-4" />
             Add Learner
@@ -688,11 +833,19 @@ export const AdminDashboardPage: React.FC = () => {
         </div>
 
         <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
-          <p className="text-[11px] font-medium text-indigo-300">Exam Prep Papers</p>
+          <p className="text-[11px] font-medium text-indigo-300">150-Mark Exams</p>
           <p className="mt-1 text-2xl font-extrabold text-indigo-300">
-            {stats?.totalExamPapers ?? '-'}
+            {stats?.totalExams150 ?? '-'}
           </p>
-          <p className="mt-0.5 text-[10px] text-slate-400">Grades 10, 11 & 12</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">10 Past-Paper Qs each</p>
+        </div>
+
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-[11px] font-medium text-emerald-300">100-Mark Quizzes</p>
+          <p className="mt-1 text-2xl font-extrabold text-emerald-300">
+            {stats?.totalQuizzes100 ?? '-'}
+          </p>
+          <p className="mt-0.5 text-[10px] text-slate-400">10 Quiz Qs each</p>
         </div>
 
         <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4">
@@ -700,7 +853,7 @@ export const AdminDashboardPage: React.FC = () => {
           <p className="mt-1 text-2xl font-extrabold text-sky-300">
             {stats?.totalQuestions ?? '-'}
           </p>
-          <p className="mt-0.5 text-[10px] text-slate-400">MCQ, Numeric, T/F & Explain</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Past Paper & Quiz Qs</p>
         </div>
 
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
@@ -708,7 +861,7 @@ export const AdminDashboardPage: React.FC = () => {
           <p className="mt-1 text-2xl font-extrabold text-amber-300">
             {stats?.totalExamAttempts ?? '-'}
           </p>
-          <p className="mt-0.5 text-[10px] text-slate-400">Completed exam scripts</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Completed scripts</p>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -717,14 +870,6 @@ export const AdminDashboardPage: React.FC = () => {
             {stats?.overallAveragePercentage ?? 0}%
           </p>
           <p className="mt-0.5 text-[10px] text-slate-400">All grades combined</p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <p className="text-[11px] font-medium text-slate-400">Educators (ADMIN)</p>
-          <p className="mt-1 text-2xl font-extrabold text-white">{stats?.adminCount ?? '-'}</p>
-          <p className="mt-0.5 text-[10px] text-slate-400">
-            {stats?.totalAuditEvents ?? 0} audit logs
-          </p>
         </div>
       </div>
 
@@ -752,7 +897,7 @@ export const AdminDashboardPage: React.FC = () => {
             }`}
           >
             <BookOpen className="h-4 w-4" />
-            Exam Prep Papers & Upload ({examPapers.length})
+            Exams (150m) & Quizzes (100m) ({examPapers.length})
           </button>
 
           <button
@@ -869,7 +1014,7 @@ export const AdminDashboardPage: React.FC = () => {
               {lp.recentAttempts.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Submitted Exam Prep Scripts (Click to inspect answers & add teacher feedback):
+                    Submitted Exam (150m) & Quiz (100m) Scripts:
                   </p>
                   <div className="grid gap-3 md:grid-cols-2">
                     {lp.recentAttempts.map((att) => {
@@ -884,7 +1029,7 @@ export const AdminDashboardPage: React.FC = () => {
                               <span
                                 className={`rounded border px-2 py-0.5 text-[10px] font-bold ${meta.badgeClass}`}
                               >
-                                Gr {att.grade} · {meta.shortLabel}
+                                Gr {att.grade} · {meta.shortLabel} · {att.assessmentType}
                               </span>
                               <span className="font-bold text-emerald-300">
                                 {att.scoreEarned}/{att.totalMarks} ({att.percentage}%)
@@ -920,64 +1065,113 @@ export const AdminDashboardPage: React.FC = () => {
       )}
 
       {/* =================================================================== */}
-      {/* TAB 2: EXAM PAPERS & UPLOAD / BUILDER STUDIO                        */}
+      {/* TAB 2: EXAMS (150 MARKS · 10 Qs) & QUIZZES (100 MARKS · 10 Qs)      */}
       {/* =================================================================== */}
       {activeTab === 'papers' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-white">
-              Published Exam Prep Papers ({examPapers.length})
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {(['ALL', 'EXAM', 'QUIZ'] as const).map((typeFilter) => (
+                <button
+                  key={typeFilter}
+                  type="button"
+                  onClick={() => setAssessmentFilter(typeFilter)}
+                  className={`rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+                    assessmentFilter === typeFilter
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-900 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {typeFilter === 'ALL'
+                    ? `All Assessments (${examPapers.length})`
+                    : typeFilter === 'EXAM'
+                    ? 'Past Paper Exams (150 Marks · 10 Qs)'
+                    : 'Revision Quizzes (100 Marks · 10 Qs)'}
+                </button>
+              ))}
+            </div>
+
             <button
               type="button"
               onClick={() => setShowPaperBuilder(!showPaperBuilder)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
             >
               <FilePlus2 className="h-4 w-4" />
-              {showPaperBuilder ? 'Close Paper Builder' : 'Upload / Build New Exam Paper'}
+              {showPaperBuilder
+                ? 'Close Creator Studio'
+                : 'Add / Create New Exam (150m) or Quiz (100m)'}
             </button>
           </div>
 
-          {/* Exam Paper Upload & Builder Studio */}
+          {/* Exam (150 Marks, 10 Qs) & Quiz (100 Marks, 10 Qs) Creator Studio */}
           {showPaperBuilder && (
             <form
               onSubmit={handleCreateExamPaper}
               className="rounded-2xl border border-emerald-500/40 bg-slate-900/95 p-6 shadow-2xl space-y-6"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-4">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800 pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Upload className="h-5 w-5 text-emerald-400" />
-                    Upload or Build New Grade 10–12 Exam Prep Paper
+                    <FilePlus2 className="h-5 w-5 text-emerald-400" />
+                    Create {paperAssessmentType === 'EXAM' ? '150-Mark Past Paper Exam (10 Questions)' : '100-Mark Revision Quiz (10 Questions)'}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Upload an exam paper file or configure questions with Multiple Choice, Numeric, True/False, and Rubric-Graded Explain questions.
+                    {paperAssessmentType === 'EXAM'
+                      ? 'Exam Mode: Strictly 10 Past-Paper Questions totaling 150 Marks (15 marks each by default).'
+                      : 'Quiz Mode: 10 Revision Quiz Questions totaling 100 Marks (10 marks each by default).'}
                   </p>
                 </div>
 
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25">
-                  <Upload className="h-4 w-4" />
-                  <span>Upload Exam File (.json / .txt / .pdf)</span>
-                  <input
-                    type="file"
-                    accept=".json,.txt,.md,.pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
+                {/* Switch between EXAM (150m) and QUIZ (100m) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex rounded-xl border border-slate-800 bg-slate-950 p-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchBuilderMode('EXAM')}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                        paperAssessmentType === 'EXAM'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      EXAM (150 Marks · 10 Qs)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchBuilderMode('QUIZ')}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                        paperAssessmentType === 'QUIZ'
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      QUIZ (100 Marks · 10 Qs)
+                    </button>
+                  </div>
+
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Upload File</span>
+                    <input
+                      type="file"
+                      accept=".json,.txt,.md,.pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Exam Paper Title
+                    {paperAssessmentType === 'EXAM' ? 'Past Paper Exam Title' : 'Quiz Title'}
                   </label>
                   <input
                     type="text"
                     required
                     value={paperTitle}
                     onChange={(e) => setPaperTitle(e.target.value)}
-                    placeholder="e.g. Grade 11 Physical Sciences: Electric Circuits & Ohm's Law"
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-white"
                   />
                 </div>
@@ -1018,15 +1212,15 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="grid gap-4 sm:grid-cols-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Curriculum Description & Topics Covered
+                    Past Paper Source / Reference
                   </label>
                   <input
                     type="text"
                     required
-                    value={paperDesc}
-                    onChange={(e) => setPaperDesc(e.target.value)}
-                    placeholder="Topics covered in this revision paper..."
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                    value={paperSource}
+                    onChange={(e) => setPaperSource(e.target.value)}
+                    placeholder="e.g. DBE NSC November Past Paper 1"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-sky-300"
                   />
                 </div>
 
@@ -1050,8 +1244,8 @@ export const AdminDashboardPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    min={10}
-                    max={180}
+                    min={15}
+                    max={240}
                     value={paperDuration}
                     onChange={(e) => setPaperDuration(Number(e.target.value))}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-white"
@@ -1059,40 +1253,63 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Questions Builder List */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-white">
-                    Exam Questions & Grading Rubrics ({draftQuestions.length} Questions)
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={handleAddDraftQuestion}
-                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
+              {/* Live Marks & 10-Question Validator Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  <span
+                    className={`rounded-lg px-3 py-1 font-extrabold ${
+                      draftQuestions.length === 10
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    }`}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Question
-                  </button>
+                    Questions: {draftQuestions.length} / 10
+                  </span>
+
+                  <span
+                    className={`rounded-lg px-3 py-1 font-extrabold ${
+                      currentDraftTotalMarks === requiredMarks
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    }`}
+                  >
+                    Total Marks: {currentDraftTotalMarks} / {requiredMarks} Marks Required
+                  </span>
                 </div>
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleLoad10PastPaperTemplate}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/15 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/25"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Auto-Fill 10 Past-Paper Questions ({requiredMarks} Marks)
+                  </button>
+
+                  {currentDraftTotalMarks !== requiredMarks && (
+                    <button
+                      type="button"
+                      onClick={handleAutoBalanceMarks}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-500"
+                    >
+                      Auto-Balance to {requiredMarks} Marks ({requiredMarks / 10}m each)
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 10 Questions Builder List */}
+              <div className="space-y-4 max-h-[540px] overflow-y-auto pr-1">
                 {draftQuestions.map((dq, idx) => (
                   <div
                     key={idx}
                     className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-emerald-400">
-                        Question {idx + 1}
+                      <span className="text-xs font-extrabold text-emerald-400">
+                        Question {idx + 1} of {draftQuestions.length} ({dq.marks} Marks)
                       </span>
-                      {draftQuestions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDraftQuestion(idx)}
-                          className="text-xs text-rose-400 hover:underline"
-                        >
-                          Remove Question
-                        </button>
-                      )}
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-3">
@@ -1140,7 +1357,7 @@ export const AdminDashboardPage: React.FC = () => {
                         <input
                           type="number"
                           min={1}
-                          max={20}
+                          max={50}
                           value={dq.marks}
                           onChange={(e) =>
                             handleUpdateDraftQuestion(
@@ -1149,14 +1366,14 @@ export const AdminDashboardPage: React.FC = () => {
                               Number(e.target.value)
                             )
                           }
-                          className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-bold text-amber-300"
                         />
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">
-                        Question Prompt
+                        Past Paper Question Prompt
                       </label>
                       <input
                         type="text"
@@ -1165,7 +1382,6 @@ export const AdminDashboardPage: React.FC = () => {
                         onChange={(e) =>
                           handleUpdateDraftQuestion(idx, 'prompt', e.target.value)
                         }
-                        placeholder="Enter the exam question..."
                         className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-white"
                       />
                     </div>
@@ -1173,7 +1389,7 @@ export const AdminDashboardPage: React.FC = () => {
                     {dq.type === 'MULTIPLE_CHOICE' && (
                       <div>
                         <label className="block text-[11px] text-slate-400 mb-1">
-                          Options (One per line, e.g. A) ..., B) ..., C) ..., D) ...)
+                          Options (One per line: A) ..., B) ..., C) ..., D) ...)
                         </label>
                         <textarea
                           rows={3}
@@ -1208,7 +1424,7 @@ export const AdminDashboardPage: React.FC = () => {
 
                       <div>
                         <label className="block text-[11px] text-slate-400 mb-1">
-                          Rubric Keywords (comma-separated concepts for Explain/Method grading)
+                          Rubric Keywords (comma-separated for Explain & Method Grading)
                         </label>
                         <input
                           type="text"
@@ -1220,7 +1436,6 @@ export const AdminDashboardPage: React.FC = () => {
                               e.target.value
                             )
                           }
-                          placeholder="e.g. osmosis, water potential, semi-permeable"
                           className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-amber-300"
                         />
                       </div>
@@ -1228,7 +1443,7 @@ export const AdminDashboardPage: React.FC = () => {
 
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">
-                        Step-by-Step Worked Explanation (Shown to learners after grading)
+                        Step-by-Step Worked Explanation
                       </label>
                       <input
                         type="text"
@@ -1254,37 +1469,52 @@ export const AdminDashboardPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={creatingPaper}
+                  disabled={creatingPaper || currentDraftTotalMarks !== requiredMarks}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-500 disabled:opacity-50"
                 >
                   {creatingPaper && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Publish Exam Paper to Grade {paperGrade}
+                  Publish {paperAssessmentType} ({draftQuestions.length} Qs ·{' '}
+                  {currentDraftTotalMarks} Marks) to Grade {paperGrade}
                 </button>
               </div>
             </form>
           )}
 
-          {/* Published Exam Papers Table */}
+          {/* Published Exam & Quiz Papers Table */}
           <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-800 bg-slate-950/60 text-[11px] uppercase tracking-wider text-slate-400">
                   <tr>
                     <th className="px-4 py-3.5">Grade</th>
+                    <th className="px-4 py-3.5">Side / Type</th>
                     <th className="px-4 py-3.5">Subject</th>
-                    <th className="px-4 py-3.5">Exam Paper Title</th>
-                    <th className="px-4 py-3.5">Questions & Marks</th>
+                    <th className="px-4 py-3.5">Title & Past Paper Source</th>
+                    <th className="px-4 py-3.5">Structure</th>
                     <th className="px-4 py-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/70">
-                  {examPapers.map((p) => {
+                  {filteredPapers.map((p) => {
                     const meta = SUBJECT_METADATA[p.subject];
                     return (
                       <tr key={p.id} className="hover:bg-slate-800/30">
                         <td className="px-4 py-3.5">
                           <span className="rounded-md bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
                             Grade {p.grade}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`rounded-md px-2.5 py-0.5 text-[11px] font-extrabold ${
+                              p.assessmentType === 'EXAM'
+                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            }`}
+                          >
+                            {p.assessmentType === 'EXAM'
+                              ? 'EXAM · 150m'
+                              : 'QUIZ · 100m'}
                           </span>
                         </td>
                         <td className="px-4 py-3.5">
@@ -1296,12 +1526,13 @@ export const AdminDashboardPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="font-bold text-white">{p.title}</div>
-                          <div className="text-slate-400 line-clamp-1">{p.description}</div>
+                          <div className="text-[11px] text-sky-300">
+                            {p.pastPaperSource || p.description}
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-slate-300">
-                          {p.questionCount} Qs ·{' '}
-                          <strong className="text-amber-300">{p.totalMarks} Marks</strong> ·{' '}
-                          {p.durationMinutes}m
+                          <strong>{p.questionCount} Questions</strong> ·{' '}
+                          <strong className="text-amber-300">{p.totalMarks} Marks</strong>
                         </td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -1519,7 +1750,8 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
               <div>
                 <span className="rounded bg-indigo-500/20 px-2.5 py-0.5 text-xs font-bold text-indigo-300">
-                  Learner: {inspectedAttempt.userName} (Grade {inspectedAttempt.grade})
+                  Learner: {inspectedAttempt.userName} (Grade {inspectedAttempt.grade} ·{' '}
+                  {inspectedAttempt.assessmentType})
                 </span>
                 <h3 className="mt-1.5 text-lg font-bold text-white">
                   {inspectedAttempt.examPaperTitle} - {inspectedAttempt.scoreEarned}/
