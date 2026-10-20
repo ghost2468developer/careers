@@ -52,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setSession = (token: string, loggedInUser: User) => {
     setStoredToken(token);
+    localStorage.removeItem('matricprep_learner_guide_dismissed_v1');
     setUser(loggedInUser);
   };
 

@@ -17,6 +17,7 @@ import {
   Lock,
   Eye,
   X,
+  HelpCircle,
 } from 'lucide-react';
 import {
   AssessmentType,
@@ -32,6 +33,9 @@ import {
   USER_OPERATIONS,
 } from '../lib/graphql';
 import { useAuth } from '../context/AuthContext';
+import { LearnerGuideTour, LEARNER_GUIDE_STEPS } from '../components/LearnerGuideTour';
+
+const GUIDE_SEEN_KEY = 'matricprep_learner_guide_dismissed_v1';
 
 export const UserDashboardPage: React.FC = () => {
   const { user, updateUserState } = useAuth();
@@ -50,11 +54,19 @@ export const UserDashboardPage: React.FC = () => {
 
   const [inspectedAttempt, setInspectedAttempt] = useState<ExamAttempt | null>(null);
 
+  // Floating Guide Tour State - automatically opens for learners when they log in!
+  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(() => {
+    return localStorage.getItem(GUIDE_SEEN_KEY) !== 'true';
+  });
+  const [guideStepIndex, setGuideStepIndex] = useState<number>(0);
+
+  // Profile & Password state
   const [name, setName] = useState(user?.name || '');
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
-    null
-  );
+  const [profileMsg, setProfileMsg] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -98,6 +110,29 @@ export const UserDashboardPage: React.FC = () => {
     loadGradePortal(activeGrade, selectedSubject, assessmentFilter);
   }, [activeGrade, selectedSubject, activeTab, loadGradePortal]);
 
+  const handleOpenGuide = () => {
+    if (activeTab === 'history' || activeTab === 'profile') {
+      setActiveTab('EXAM');
+    }
+    setGuideStepIndex(0);
+    setIsGuideOpen(true);
+  };
+
+  const handleCloseGuide = () => {
+    localStorage.setItem(GUIDE_SEEN_KEY, 'true');
+    setIsGuideOpen(false);
+  };
+
+  const handleNextGuideStep = () => {
+    setGuideStepIndex((prev) =>
+      prev < LEARNER_GUIDE_STEPS.length - 1 ? prev + 1 : prev
+    );
+  };
+
+  const handlePrevGuideStep = () => {
+    setGuideStepIndex((prev) => (prev > 0 ? prev - 1 : 0));
+  };
+
   const handleSelectGrade = async (newGrade: number) => {
     if (newGrade === activeGrade) return;
     setSwitchingGrade(true);
@@ -127,7 +162,7 @@ export const UserDashboardPage: React.FC = () => {
         }
       );
       updateUserState(data.updateProfile);
-      setProfileMsg({ type: 'success', text: 'Learner profile saved successfully.' });
+      setProfileMsg({ type: 'success', text: 'Your profile has been saved!' });
     } catch (err) {
       setProfileMsg({
         type: 'error',
@@ -153,7 +188,7 @@ export const UserDashboardPage: React.FC = () => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setPasswordMsg({ type: 'success', text: 'Password updated successfully.' });
+      setPasswordMsg({ type: 'success', text: 'Password updated successfully!' });
     } catch (err) {
       setPasswordMsg({
         type: 'error',
@@ -164,52 +199,68 @@ export const UserDashboardPage: React.FC = () => {
     }
   };
 
+  const firstName = user?.name?.split(' ')[0] || 'Learner';
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 space-y-8 pb-24">
       {/* =================================================================== */}
-      {/* TOP BANNER & STRICT GRADE SELECTOR (GRADE 10 | GRADE 11 | GRADE 12) */}
+      {/* FRIENDLY HERO BANNER + STEP 1: CHOOSE YOUR GRADE                    */}
       {/* =================================================================== */}
-      <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 p-6 shadow-xl">
+      <div className="rounded-3xl border border-slate-800/90 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/50 p-6 sm:p-8 shadow-xl">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-0.5 text-xs font-bold text-emerald-300">
-                <GraduationCap className="h-3.5 w-3.5" />
-                GRADE {activeGrade} PAST PAPER EXAMS (150 MARKS) & QUIZZES (100 MARKS)
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3.5 py-1 text-xs font-extrabold text-emerald-300">
+                <GraduationCap className="h-4 w-4" />
+                Grade {activeGrade} Study Space
               </span>
+
+              {/* Button to Trigger the Floating Interactive Guide */}
+              <button
+                type="button"
+                onClick={handleOpenGuide}
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-3.5 py-1 text-xs font-bold text-amber-200 transition hover:bg-amber-500/25"
+              >
+                <HelpCircle className="h-3.5 w-3.5 text-amber-300" />
+                <span>Show Interactive Guide</span>
+              </button>
+
               {user?.role === 'ADMIN' && (
                 <Link
                   to="/admin"
-                  className="inline-flex items-center gap-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 px-3 py-0.5 text-xs font-bold text-indigo-300 hover:bg-indigo-500/30"
+                  className="inline-flex items-center gap-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 text-xs font-bold text-indigo-300 hover:bg-indigo-500/30"
                 >
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  Switch to Admin Console
+                  Admin Console
                 </Link>
               )}
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-              Welcome, {user?.name} - Showing Grade {activeGrade} Only
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Hi {firstName}! Ready to practice for Grade {activeGrade}?
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-2xl">
-              Choose between the{' '}
-              <strong className="text-indigo-300">
-                Past Paper Exam Side (150 Marks · 10 Questions)
-              </strong>{' '}
-              and the{' '}
-              <strong className="text-emerald-300">
-                Revision Quiz Side (100 Marks · 10 Questions)
-              </strong>{' '}
-              filtered strictly to <strong className="text-white">Grade {activeGrade}</strong>.
+            <p className="text-sm text-slate-300 max-w-xl leading-relaxed">
+              Everything on this page is filtered strictly for{' '}
+              <strong className="text-emerald-300">Grade {activeGrade}</strong>. Pick{' '}
+              <strong className="text-indigo-300">150-Mark Past Paper Exams</strong> or{' '}
+              <strong className="text-emerald-300">100-Mark Quizzes</strong> below to start!
             </p>
           </div>
 
-          {/* Grade 10 / Grade 11 / Grade 12 Selector Pills */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Select Active Grade Level:
-            </span>
-            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-800 bg-slate-950 p-1.5">
+          {/* STEP 1: Grade 10 / 11 / 12 Selector (Highlighted by Guide Step 1) */}
+          <div
+            id="guide-grade-selector"
+            className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5 space-y-2"
+          >
+            <div className="flex items-center justify-between gap-2 px-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                1. Your Grade Level
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Showing Grade {activeGrade} only
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
               {[10, 11, 12].map((g) => {
                 const isSelected = activeGrade === g;
                 return (
@@ -218,19 +269,19 @@ export const UserDashboardPage: React.FC = () => {
                     type="button"
                     disabled={switchingGrade}
                     onClick={() => handleSelectGrade(g)}
-                    className={`flex flex-col items-center justify-center rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                    className={`flex flex-col items-center justify-center rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
                       isSelected
-                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
-                        : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+                        ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25 scale-[1.02]'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white'
                     }`}
                   >
                     <span className="text-sm font-extrabold">Grade {g}</span>
                     <span
-                      className={`text-[10px] font-medium ${
-                        isSelected ? 'text-emerald-100' : 'text-slate-500'
+                      className={`text-[10px] font-semibold ${
+                        isSelected ? 'text-slate-900' : 'text-slate-500'
                       }`}
                     >
-                      {g === 12 ? 'Only Gr 12' : `Only Gr ${g}`}
+                      {g === 12 ? 'Matric' : `Gr ${g} Only`}
                     </span>
                   </button>
                 );
@@ -239,296 +290,315 @@ export const UserDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Grade KPI Summary Row */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-slate-800/80 pt-5">
-          <div className="rounded-xl border border-indigo-500/25 bg-indigo-950/20 p-3.5">
-            <p className="text-[11px] text-indigo-300 font-semibold">
-              Grade {activeGrade} Past Paper Exams
-            </p>
-            <p className="mt-1 text-xl font-extrabold text-white">
-              {progress?.totalExamsInGrade ?? 5} Exams (150 Marks)
-            </p>
-            <p className="text-[11px] text-slate-400">10 Past-Paper Questions each</p>
+        {/* Simple, Encouraging 3-Pill Summary */}
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 border-t border-slate-800/80 pt-5">
+          <div className="flex items-center gap-3.5 rounded-2xl border border-indigo-500/25 bg-indigo-950/25 px-4 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-300">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-400">
+                Grade {activeGrade} Past Paper Exams
+              </p>
+              <p className="text-base font-extrabold text-white">
+                {progress?.totalExamsInGrade ?? 5} Exams · 150 Marks Each
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-3.5">
-            <p className="text-[11px] text-emerald-300 font-semibold">
-              Grade {activeGrade} Revision Quizzes
-            </p>
-            <p className="mt-1 text-xl font-extrabold text-white">
-              {progress?.totalQuizzesInGrade ?? 5} Quizzes (100 Marks)
-            </p>
-            <p className="text-[11px] text-slate-400">10 Quiz Questions each</p>
+          <div className="flex items-center gap-3.5 rounded-2xl border border-emerald-500/25 bg-emerald-950/25 px-4 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-400">
+                Grade {activeGrade} Revision Quizzes
+              </p>
+              <p className="text-base font-extrabold text-white">
+                {progress?.totalQuizzesInGrade ?? 5} Quizzes · 100 Marks Each
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
-            <p className="text-[11px] text-slate-400">Your Grade {activeGrade} Average</p>
-            <p className="mt-1 text-xl font-extrabold text-emerald-300">
-              {progress?.averagePercentage ?? 0}%
-            </p>
-            <p className="text-[11px] text-slate-400">
-              Across {progress?.totalAttempts ?? 0} attempts
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
-            <p className="text-[11px] text-slate-400">CAPS Achievement Level</p>
-            <p className="mt-1 text-sm font-extrabold text-amber-300 truncate">
-              {progress?.achievementLevel || 'Ready to start'}
-            </p>
-            <p className="text-[11px] text-slate-400">
-              {progress?.papersCompleted ?? 0} papers completed
-            </p>
+          <div className="flex items-center gap-3.5 rounded-2xl border border-amber-500/25 bg-amber-950/20 px-4 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
+              <Award className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-400">Your Average Score</p>
+              <p className="text-base font-extrabold text-white">
+                {progress?.totalAttempts
+                  ? `${progress.averagePercentage}% (${progress.totalAttempts} completed)`
+                  : 'Ready for your first paper!'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* =================================================================== */}
-      {/* 5 SUBJECT CARDS FOR ACTIVE GRADE                                    */}
+      {/* STEP 2: BIG, FRIENDLY SIDE SWITCHER (EXAMS 150m vs QUIZZES 100m)    */}
       {/* =================================================================== */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-emerald-400" />
-            Grade {activeGrade} Subjects (Mathematics, Maths Literacy, Physical Sciences, Life Sciences, Geography)
-          </h2>
-          {selectedSubject !== 'ALL' && (
+      <div id="guide-side-switcher" className="space-y-2.5 rounded-3xl">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            2. Choose What You Want to Do Today
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Side A: Past Paper Exams (150 Marks · 10 Questions) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('EXAM')}
+            className={`flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-all ${
+              activeTab === 'EXAM'
+                ? 'border-indigo-400 bg-indigo-600/20 shadow-lg shadow-indigo-600/15'
+                : 'border-slate-800 bg-slate-900/75 hover:border-slate-700'
+            }`}
+          >
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                activeTab === 'EXAM'
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-slate-800 text-indigo-300'
+              }`}
+            >
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-white">Past Paper Exams</p>
+              <p className="mt-0.5 text-xs font-semibold text-indigo-300">
+                150 Marks · 10 Questions
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Full past-paper questions (15m each)
+              </p>
+            </div>
+          </button>
+
+          {/* Side B: Revision Quizzes (100 Marks · 10 Questions) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('QUIZ')}
+            className={`flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-all ${
+              activeTab === 'QUIZ'
+                ? 'border-emerald-400 bg-emerald-600/20 shadow-lg shadow-emerald-600/15'
+                : 'border-slate-800 bg-slate-900/75 hover:border-slate-700'
+            }`}
+          >
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                activeTab === 'QUIZ'
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'bg-slate-800 text-emerald-300'
+              }`}
+            >
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-white">Revision Quizzes</p>
+              <p className="mt-0.5 text-xs font-semibold text-emerald-300">
+                100 Marks · 10 Questions
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Quick topic mastery quizzes (10m each)
+              </p>
+            </div>
+          </button>
+
+          {/* Side C: My Results & Worked Memorandums */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('history')}
+            className={`flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-all ${
+              activeTab === 'history'
+                ? 'border-amber-400 bg-amber-600/20 shadow-lg shadow-amber-600/15'
+                : 'border-slate-800 bg-slate-900/75 hover:border-slate-700'
+            }`}
+          >
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                activeTab === 'history'
+                  ? 'bg-amber-500 text-slate-950'
+                  : 'bg-slate-800 text-amber-300'
+              }`}
+            >
+              <Award className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-white">My Results & Memos</p>
+              <p className="mt-0.5 text-xs font-semibold text-amber-300">
+                {progress?.recentAttempts.length ?? 0} Completed Scripts
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                See marks & teacher feedback
+              </p>
+            </div>
+          </button>
+
+          {/* Side D: My Profile */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-all ${
+              activeTab === 'profile'
+                ? 'border-sky-400 bg-sky-600/20 shadow-lg'
+                : 'border-slate-800 bg-slate-900/75 hover:border-slate-700'
+            }`}
+          >
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                activeTab === 'profile'
+                  ? 'bg-sky-500 text-slate-950'
+                  : 'bg-slate-800 text-sky-300'
+              }`}
+            >
+              <UserIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-white">My Profile</p>
+              <p className="mt-0.5 text-xs font-semibold text-sky-300">
+                Grade {activeGrade} Settings
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Update name or password
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* =================================================================== */}
+      {/* STEP 3: FRIENDLY SUBJECT FILTER PILLS (WHEN ON EXAMS OR QUIZZES)    */}
+      {/* =================================================================== */}
+      {(activeTab === 'EXAM' || activeTab === 'QUIZ') && (
+        <div id="guide-subject-pills" className="space-y-3 rounded-2xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5 text-emerald-400" />
+              3. Pick a Grade {activeGrade} Subject
+            </span>
+            {selectedSubject !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setSelectedSubject('ALL')}
+                className="text-xs font-bold text-emerald-400 hover:underline"
+              >
+                Show All 5 Subjects
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setSelectedSubject('ALL')}
-              className="text-xs font-semibold text-emerald-400 hover:underline"
-            >
-              Show All 5 Subjects for Grade {activeGrade}
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <button
-            type="button"
-            onClick={() => setSelectedSubject('ALL')}
-            className={`flex flex-col justify-between rounded-2xl border p-4 text-left transition ${
-              selectedSubject === 'ALL'
-                ? 'border-emerald-500 bg-emerald-500/15 shadow-md'
-                : 'border-slate-800 bg-slate-900/70 hover:border-slate-700'
-            }`}
-          >
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-                All Subjects
-              </span>
-              <p className="mt-1 text-sm font-bold text-white">
-                Grade {activeGrade} Complete
-              </p>
-            </div>
-            <p className="mt-3 text-[11px] text-slate-400">
-              {progress?.totalExamsInGrade ?? 5} Exams · {progress?.totalQuizzesInGrade ?? 5} Quizzes
-            </p>
-          </button>
-
-          {(progress?.subjectSummaries || []).map((subj) => {
-            const isSelected = selectedSubject === subj.subject;
-            const meta = SUBJECT_METADATA[subj.subject];
-            return (
-              <button
-                key={subj.subject}
-                type="button"
-                onClick={() => setSelectedSubject(subj.subject)}
-                className={`flex flex-col justify-between rounded-2xl border p-4 text-left transition ${
-                  isSelected
-                    ? 'border-indigo-500 bg-indigo-500/15 shadow-md'
-                    : 'border-slate-800 bg-slate-900/70 hover:border-slate-700'
-                }`}
-              >
-                <div>
-                  <span
-                    className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-bold ${meta.badgeClass}`}
-                  >
-                    Gr {activeGrade}
-                  </span>
-                  <p className="mt-1.5 text-xs font-bold text-white leading-snug">
-                    {subj.label}
-                  </p>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>
-                    {subj.examCount} Exam · {subj.quizCount} Quiz
-                  </span>
-                  {subj.attemptsCount > 0 && (
-                    <span className="font-bold text-emerald-300">
-                      {subj.bestPercentage}%
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* =================================================================== */}
-      {/* SIDE SWITCHER: EXAM SIDE (150 MARKS) vs QUIZ SIDE (100 MARKS)       */}
-      {/* =================================================================== */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab('EXAM')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
-            activeTab === 'EXAM'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
-              : 'bg-slate-900 text-slate-400 hover:text-white'
-          }`}
-        >
-          <FileText className="h-4 w-4" />
-          Past Paper Exams Side (150 Marks · 10 Questions)
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('QUIZ')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
-            activeTab === 'QUIZ'
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
-              : 'bg-slate-900 text-slate-400 hover:text-white'
-          }`}
-        >
-          <Zap className="h-4 w-4" />
-          Revision Quiz Side (100 Marks · 10 Questions)
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
-            activeTab === 'history'
-              ? 'bg-amber-600 text-white'
-              : 'bg-slate-900 text-slate-400 hover:text-white'
-          }`}
-        >
-          <Award className="h-4 w-4" />
-          My Grade {activeGrade} Results & Memorandums (
-          {progress?.recentAttempts.length ?? 0})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('profile')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
-            activeTab === 'profile'
-              ? 'bg-slate-800 text-white'
-              : 'bg-slate-900 text-slate-400 hover:text-white'
-          }`}
-        >
-          <UserIcon className="h-4 w-4" />
-          Learner Profile
-        </button>
-      </div>
-
-      {/* =================================================================== */}
-      {/* TAB 1 & 2: EXAM SIDE (150 MARKS · 10 Qs) OR QUIZ SIDE (100 MARKS)   */}
-      {/* =================================================================== */}
-      {(activeTab === 'EXAM' || activeTab === 'QUIZ') && (
-        <div className="space-y-4">
-          <div
-            className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              activeTab === 'EXAM'
-                ? 'border-indigo-500/30 bg-indigo-950/20'
-                : 'border-emerald-500/30 bg-emerald-950/20'
-            }`}
-          >
-            <div>
-              <h3 className="text-sm font-bold text-white">
-                {activeTab === 'EXAM'
-                  ? `Grade ${activeGrade} National Past Paper Examinations - 150 Marks · 10 Questions Each`
-                  : `Grade ${activeGrade} Topic Mastery Quizzes - 100 Marks · 10 Questions Each`}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {activeTab === 'EXAM'
-                  ? 'Full 150-mark past paper exams with 10 structured questions (15 marks per question) covering Multiple Choice, Calculations, True/False, and Rubric Explain questions.'
-                  : '100-mark interactive quizzes (10 marks per question) designed for rapid topic revision and instant step-by-step explanations.'}
-              </p>
-            </div>
-            <span
-              className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-extrabold ${
-                activeTab === 'EXAM'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-emerald-600 text-white'
+              className={`rounded-2xl border px-4 py-2.5 text-xs font-extrabold transition-all ${
+                selectedSubject === 'ALL'
+                  ? 'border-emerald-400 bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'border-slate-800 bg-slate-900/90 text-slate-300 hover:border-slate-700 hover:text-white'
               }`}
             >
-              {activeTab === 'EXAM'
-                ? '150 MARKS · 10 QUESTIONS'
-                : '100 MARKS · 10 QUESTIONS'}
-            </span>
-          </div>
+              All 5 Subjects
+            </button>
 
+            {(progress?.subjectSummaries || []).map((subj) => {
+              const isSelected = selectedSubject === subj.subject;
+              return (
+                <button
+                  key={subj.subject}
+                  type="button"
+                  onClick={() => setSelectedSubject(subj.subject)}
+                  className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold transition-all ${
+                    isSelected
+                      ? 'border-emerald-400 bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                      : 'border-slate-800 bg-slate-900/90 text-slate-200 hover:border-slate-700 hover:text-white'
+                  }`}
+                >
+                  <span>{subj.label}</span>
+                  {subj.attemptsCount > 0 && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                        isSelected
+                          ? 'bg-slate-950/20 text-slate-950'
+                          : 'bg-emerald-500/20 text-emerald-300'
+                      }`}
+                    >
+                      Best: {subj.bestPercentage}%
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 4: SIMPLE, FRIENDLY EXAM (150m) & QUIZ (100m) CARDS            */}
+      {/* =================================================================== */}
+      {(activeTab === 'EXAM' || activeTab === 'QUIZ') && (
+        <div id="guide-paper-cards" className="space-y-4 rounded-3xl">
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
+            <div className="flex items-center justify-center py-16 text-slate-300 gap-2.5">
               <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
-              <span className="text-sm">
-                Loading Grade {activeGrade}{' '}
+              <span className="text-sm font-medium">
+                Loading your Grade {activeGrade}{' '}
                 {activeTab === 'EXAM' ? '150-Mark Past Paper Exams' : '100-Mark Quizzes'}...
               </span>
             </div>
           ) : papers.length === 0 ? (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center">
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center">
               <p className="text-sm text-slate-400">
-                No {activeTab === 'EXAM' ? '150-mark exams' : '100-mark quizzes'} found for
-                Grade {activeGrade} in this subject filter.
+                No {activeTab === 'EXAM' ? 'exams' : 'quizzes'} found for this filter.
               </p>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-2">
               {papers.map((paper) => {
                 const meta = SUBJECT_METADATA[paper.subject];
-                const typeCounts = paper.questions.reduce<Record<string, number>>(
-                  (acc, q) => {
-                    acc[q.type] = (acc[q.type] || 0) + 1;
-                    return acc;
-                  },
-                  {}
-                );
+                const isExam = paper.assessmentType === 'EXAM';
 
                 return (
                   <div
                     key={paper.id}
-                    className="flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-900/85 p-6 shadow-lg transition hover:border-slate-700"
+                    className="flex flex-col justify-between rounded-3xl border border-slate-800/90 bg-slate-900/90 p-6 shadow-lg transition-all hover:border-slate-700"
                   >
                     <div className="space-y-3">
+                      {/* Friendly Top Badges */}
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-lg bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 text-xs font-extrabold text-emerald-300">
-                            Grade {paper.grade}
-                          </span>
                           <span
-                            className={`rounded-lg border px-2.5 py-0.5 text-xs font-bold ${meta.badgeClass}`}
+                            className={`rounded-xl border px-3 py-1 text-xs font-bold ${meta.badgeClass}`}
                           >
                             {meta.label}
                           </span>
-                          <span
-                            className={`rounded-lg px-2.5 py-0.5 text-xs font-extrabold ${
-                              paper.assessmentType === 'EXAM'
-                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                            }`}
-                          >
-                            {paper.assessmentType === 'EXAM'
-                              ? 'EXAM · 150 MARKS'
-                              : 'QUIZ · 100 MARKS'}
+                          <span className="rounded-xl bg-slate-800 px-2.5 py-1 text-xs font-bold text-slate-300">
+                            Grade {paper.grade}
                           </span>
                         </div>
-                        <span className="flex items-center gap-1 text-xs font-semibold text-amber-300">
+
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-extrabold ${
+                            isExam
+                              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          }`}
+                        >
                           <Clock className="h-3.5 w-3.5" />
-                          {paper.questionCount} Qs · {paper.totalMarks} Marks
+                          {paper.questionCount} Questions · {paper.totalMarks} Marks
                         </span>
                       </div>
 
-                      <h3 className="text-lg font-bold text-white leading-snug">
+                      {/* Title & Friendly Description */}
+                      <h3 className="text-lg font-extrabold text-white leading-snug">
                         {paper.title}
                       </h3>
 
                       {paper.pastPaperSource && (
-                        <p className="text-[11px] font-medium text-sky-300">
-                          Source: {paper.pastPaperSource}
+                        <p className="text-xs font-medium text-sky-300">
+                          📄 {paper.pastPaperSource}
                         </p>
                       )}
 
@@ -536,43 +606,35 @@ export const UserDashboardPage: React.FC = () => {
                         {paper.description}
                       </p>
 
-                      {/* Question Type Variety Badges */}
-                      <div className="pt-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                          Question Breakdown ({paper.questionCount} Questions ={' '}
-                          {paper.totalMarks} Marks):
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(typeCounts).map(([qType, count]) => (
-                            <span
-                              key={qType}
-                              className="rounded-md border border-slate-800 bg-slate-950 px-2.5 py-1 text-[11px] font-medium text-slate-300"
-                            >
-                              {count}×{' '}
-                              {QUESTION_TYPE_LABELS[qType as keyof typeof QUESTION_TYPE_LABELS]}
-                            </span>
-                          ))}
-                        </div>
+                      {/* Simple, Friendly Question Summary Pill */}
+                      <div className="rounded-2xl border border-slate-800/90 bg-slate-950/70 px-3.5 py-2.5 text-[11px] text-slate-300 flex items-center justify-between">
+                        <span>
+                          Includes Multiple Choice, Calculations, True/False & Explain
+                        </span>
+                        <span className="font-bold text-amber-300 shrink-0 ml-2">
+                          {isExam ? '15m per Q' : '10m per Q'}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="mt-6 grid grid-cols-2 gap-3 border-t border-slate-800/80 pt-4">
+                    {/* Two Simple, Friendly Action Buttons */}
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-800/80 pt-4">
                       <button
                         type="button"
                         onClick={() => navigate(`/exam/${paper.id}?mode=REVISION`)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-extrabold text-slate-950 shadow-md shadow-emerald-500/20 transition hover:bg-emerald-400"
                       >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Practice & Explain ({paper.totalMarks}m)
+                        <Sparkles className="h-4 w-4" />
+                        Practice Mode (With Memo)
                       </button>
 
                       <button
                         type="button"
                         onClick={() => navigate(`/exam/${paper.id}?mode=EXAM`)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/15 px-3.5 py-2.5 text-xs font-bold text-indigo-300 transition hover:bg-indigo-500/25"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-500/40 bg-indigo-500/15 px-4 py-3 text-xs font-bold text-indigo-200 transition hover:bg-indigo-500/25"
                       >
-                        <Play className="h-3.5 w-3.5" />
-                        Timed {paper.assessmentType === 'EXAM' ? 'Exam (150m)' : 'Quiz (100m)'}
+                        <Play className="h-4 w-4" />
+                        Start Timed ({paper.totalMarks} Marks)
                       </button>
                     </div>
                   </div>
@@ -584,98 +646,77 @@ export const UserDashboardPage: React.FC = () => {
       )}
 
       {/* =================================================================== */}
-      {/* TAB 3: MY GRADED ATTEMPTS & TEACHER FEEDBACK                        */}
+      {/* TAB 3: MY GRADED RESULTS & MEMORANDUMS (FRIENDLY CARD LIST)         */}
       {/* =================================================================== */}
       {activeTab === 'history' && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
+        <div className="space-y-4">
           {!progress || progress.recentAttempts.length === 0 ? (
-            <div className="p-12 text-center space-y-3">
-              <p className="text-sm text-slate-400">
-                You haven&apos;t completed any Grade {activeGrade} exams or quizzes yet.
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-12 text-center space-y-3">
+              <p className="text-base font-bold text-white">
+                No completed Grade {activeGrade} papers yet!
+              </p>
+              <p className="text-xs text-slate-400">
+                Complete a 150-Mark Exam or 100-Mark Quiz to see your marks and worked answers here.
               </p>
               <button
                 type="button"
                 onClick={() => setActiveTab('EXAM')}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                className="rounded-2xl bg-emerald-500 px-5 py-2.5 text-xs font-extrabold text-slate-950"
               >
-                Browse Grade {activeGrade} 150-Mark Past Paper Exams
+                Go to Grade {activeGrade} Past Paper Exams
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-800 bg-slate-950/60 text-[11px] uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3.5">Assessment</th>
-                    <th className="px-4 py-3.5">Type</th>
-                    <th className="px-4 py-3.5">Subject</th>
-                    <th className="px-4 py-3.5">Score & Percentage</th>
-                    <th className="px-4 py-3.5">CAPS Achievement</th>
-                    <th className="px-4 py-3.5">Teacher Feedback</th>
-                    <th className="px-4 py-3.5 text-right">Review Memo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/70">
-                  {progress.recentAttempts.map((att) => {
-                    const meta = SUBJECT_METADATA[att.subject];
-                    return (
-                      <tr key={att.id} className="hover:bg-slate-800/30">
-                        <td className="px-4 py-3.5">
-                          <div className="font-bold text-white">{att.examPaperTitle}</div>
-                          <div className="text-[11px] text-slate-400">
-                            Grade {att.grade} · {new Date(att.completedAt).toLocaleString()}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span
-                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                              att.assessmentType === 'EXAM'
-                                ? 'bg-indigo-500/20 text-indigo-300'
-                                : 'bg-emerald-500/20 text-emerald-300'
-                            }`}
-                          >
-                            {att.assessmentType} ({att.totalMarks}m)
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span
-                            className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${meta.badgeClass}`}
-                          >
-                            {meta.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className="font-bold text-emerald-300">
-                            {att.scoreEarned} / {att.totalMarks} ({att.percentage}%)
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-amber-300 font-medium">
-                          {att.gradeSymbol}
-                        </td>
-                        <td className="px-4 py-3.5 text-slate-300 max-w-xs">
-                          {att.teacherFeedback ? (
-                            <span className="italic text-indigo-300">
-                              &ldquo;{att.teacherFeedback}&rdquo;
-                            </span>
-                          ) : (
-                            <span className="text-slate-500">Auto-graded via Rubric</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setInspectedAttempt(att)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-                          >
-                            <Eye className="h-3.5 w-3.5 text-emerald-400" />
-                            View Memo
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="grid gap-4 md:grid-cols-2">
+              {progress.recentAttempts.map((att) => {
+                const meta = SUBJECT_METADATA[att.subject];
+                return (
+                  <div
+                    key={att.id}
+                    className="flex flex-col justify-between rounded-3xl border border-slate-800 bg-slate-900/85 p-5 space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className={`rounded-xl border px-2.5 py-0.5 text-xs font-bold ${meta.badgeClass}`}
+                        >
+                          {meta.label}
+                        </span>
+                        <span className="rounded-xl bg-emerald-500/20 border border-emerald-500/30 px-3 py-0.5 text-xs font-extrabold text-emerald-300">
+                          {att.scoreEarned} / {att.totalMarks} Marks ({att.percentage}%)
+                        </span>
+                      </div>
+
+                      <h3 className="text-base font-extrabold text-white">
+                        {att.examPaperTitle}
+                      </h3>
+                      <p className="text-xs font-semibold text-amber-300">
+                        {att.gradeSymbol}
+                      </p>
+
+                      {att.teacherFeedback && (
+                        <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/30 p-3 text-xs text-indigo-200">
+                          <strong>Teacher Note:</strong> &ldquo;{att.teacherFeedback}&rdquo;
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-slate-800 pt-3">
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(att.completedAt).toLocaleDateString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setInspectedAttempt(att)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-700"
+                      >
+                        <Eye className="h-3.5 w-3.5 text-emerald-400" />
+                        View Worked Answers
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -686,10 +727,10 @@ export const UserDashboardPage: React.FC = () => {
       {/* =================================================================== */}
       {activeTab === 'profile' && (
         <div className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
             <div className="mb-4 flex items-center gap-2.5">
               <UserIcon className="h-5 w-5 text-emerald-400" />
-              <h3 className="text-base font-bold text-white">Learner Profile & Grade</h3>
+              <h3 className="text-base font-bold text-white">My Learner Profile</h3>
             </div>
 
             {profileMsg && (
@@ -712,7 +753,7 @@ export const UserDashboardPage: React.FC = () => {
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Full Name
+                  Your Full Name
                 </label>
                 <input
                   type="text"
@@ -725,7 +766,7 @@ export const UserDashboardPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  Enrolled Grade Level
+                  Your Grade Level
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[10, 11, 12].map((g) => (
@@ -748,7 +789,7 @@ export const UserDashboardPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-extrabold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
               >
                 {savingProfile && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Save Profile
@@ -756,7 +797,7 @@ export const UserDashboardPage: React.FC = () => {
             </form>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
             <div className="mb-4 flex items-center gap-2.5">
               <Lock className="h-5 w-5 text-amber-400" />
               <h3 className="text-base font-bold text-white">Change Password</h3>
@@ -781,15 +822,15 @@ export const UserDashboardPage: React.FC = () => {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Current password"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
               />
               <input
                 type="password"
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="New password (min. 6 chars)"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                placeholder="New password (min. 6 characters)"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
               />
               <input
                 type="password"
@@ -797,12 +838,12 @@ export const UserDashboardPage: React.FC = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
               />
               <button
                 type="submit"
                 disabled={savingPassword}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700"
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-700"
               >
                 Update Password
               </button>
@@ -816,30 +857,30 @@ export const UserDashboardPage: React.FC = () => {
       {/* =================================================================== */}
       {inspectedAttempt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-5">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-5">
             <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
               <div>
-                <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                <span className="rounded-lg bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
                   Grade {inspectedAttempt.grade} · {inspectedAttempt.assessmentType} ·{' '}
                   {inspectedAttempt.percentage}% ({inspectedAttempt.scoreEarned}/
                   {inspectedAttempt.totalMarks} Marks)
                 </span>
-                <h3 className="mt-1 text-lg font-bold text-white">
+                <h3 className="mt-1.5 text-lg font-extrabold text-white">
                   {inspectedAttempt.examPaperTitle}
                 </h3>
                 <p className="text-xs text-amber-300">{inspectedAttempt.gradeSymbol}</p>
               </div>
               <button
                 onClick={() => setInspectedAttempt(null)}
-                className="rounded-lg bg-slate-800 p-1.5 text-slate-400 hover:text-white"
+                className="rounded-xl bg-slate-800 p-2 text-slate-400 hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {inspectedAttempt.teacherFeedback && (
-              <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3.5 text-xs text-indigo-200">
-                <strong>Educator / Admin Feedback:</strong> &ldquo;
+              <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-xs text-indigo-200">
+                <strong>Teacher Feedback:</strong> &ldquo;
                 {inspectedAttempt.teacherFeedback}&rdquo;
               </div>
             )}
@@ -848,7 +889,7 @@ export const UserDashboardPage: React.FC = () => {
               {inspectedAttempt.answers.map((ans) => (
                 <div
                   key={ans.id}
-                  className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-2 text-xs"
+                  className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white">
@@ -867,7 +908,7 @@ export const UserDashboardPage: React.FC = () => {
                     <strong>Model Answer:</strong> {ans.correctAnswer}
                   </p>
                   <p className="text-sky-300">
-                    <strong>Explanation:</strong> {ans.explanation}
+                    <strong>Worked Explanation:</strong> {ans.explanation}
                   </p>
                 </div>
               ))}
@@ -875,6 +916,20 @@ export const UserDashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* =================================================================== */}
+      {/* FLOATING INTERACTIVE LEARNER GUIDE & TRIGGER BUTTON                 */}
+      {/* =================================================================== */}
+      <LearnerGuideTour
+        isOpen={isGuideOpen}
+        currentStepIndex={guideStepIndex}
+        onNext={handleNextGuideStep}
+        onPrev={handlePrevGuideStep}
+        onSelectStep={(idx) => setGuideStepIndex(idx)}
+        onClose={handleCloseGuide}
+        onOpen={handleOpenGuide}
+        learnerName={user?.name}
+      />
     </div>
   );
 };
