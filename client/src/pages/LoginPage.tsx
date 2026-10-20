@@ -9,8 +9,8 @@ import {
   ArrowRight,
   AlertCircle,
   Loader2,
-  UserCheck,
-  Sparkles,
+  GraduationCap,
+  BookOpen,
 } from 'lucide-react';
 import { AUTH_OPERATIONS, AuthPayload, graphqlRequest } from '../lib/graphql';
 import { useAuth } from '../context/AuthContext';
@@ -61,30 +61,33 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl flex-col justify-center px-4 py-10 sm:px-6 lg:px-8">
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col justify-center px-4 py-10 sm:px-6 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-12 lg:items-center">
-        {/* Left column: Value prop + Demo Role Cards */}
-        <div className="lg:col-span-6 space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1 text-xs font-medium text-indigo-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            React + TypeScript + GraphQL + Prisma + PostgreSQL
+        {/* Left column: Academic Revision Value Prop + Demo Accounts */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-medium text-emerald-300">
+            <GraduationCap className="h-4 w-4" />
+            Grade 10, Grade 11 & Grade 12 Exam Preparation Platform
           </div>
 
           <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-            Role-Based Authentication & Modular GraphQL API
+            Master Grade 10–12 Exams with Interactive Grading & Step-by-Step Explanations
           </h1>
 
           <p className="text-sm leading-relaxed text-slate-400">
-            Full-stack authentication system featuring JWT sessions, bcrypt password hashing,
-            token-based password reset, and granular{' '}
-            <span className="text-indigo-300 font-semibold">ADMIN</span> &{' '}
-            <span className="text-emerald-300 font-semibold">USER</span> role access control.
+            Practice curriculum-aligned exam preps across{' '}
+            <span className="text-white font-medium">
+              Mathematics, Mathematical Literacy, Physical Sciences, Life Sciences, and Geography
+            </span>
+            . Includes Multiple-Choice, Calculation, True/False, and Rubric-Graded{' '}
+            <span className="text-emerald-300 font-semibold">Explain Questions</span> with full
+            worked memorandums.
           </p>
 
           {/* 1-Click Demo Role Switcher */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Instant Demo Accounts (Seeded in PostgreSQL)
+              1-Click Demo Accounts (Admin & Grade 10–12 Learners)
             </p>
             <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
               <button
@@ -96,12 +99,16 @@ export const LoginPage: React.FC = () => {
                 <div className="flex w-full items-center justify-between">
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-500/20 px-2 py-0.5 text-[11px] font-bold text-indigo-300">
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    ADMIN ROLE
+                    ADMIN / EDUCATOR
                   </span>
                   <ArrowRight className="h-4 w-4 text-indigo-400 transition group-hover:translate-x-0.5" />
                 </div>
-                <p className="mt-2 text-xs font-semibold text-white">admin@example.com</p>
-                <p className="text-[11px] text-slate-400">Pass: Admin123!</p>
+                <p className="mt-2 text-xs font-semibold text-white">
+                  Principal N. Mbeki (Admin)
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Monitor all learners, upload papers & review scripts
+                </p>
               </button>
 
               <button
@@ -112,25 +119,71 @@ export const LoginPage: React.FC = () => {
               >
                 <div className="flex w-full items-center justify-between">
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
-                    <UserCheck className="h-3.5 w-3.5" />
-                    USER ROLE
+                    <BookOpen className="h-3.5 w-3.5" />
+                    GRADE 10 LEARNER
                   </span>
                   <ArrowRight className="h-4 w-4 text-emerald-400 transition group-hover:translate-x-0.5" />
                 </div>
-                <p className="mt-2 text-xs font-semibold text-white">user@example.com</p>
-                <p className="text-[11px] text-slate-400">Pass: User123!</p>
+                <p className="mt-2 text-xs font-semibold text-white">
+                  Thabo Mokoena (Grade 10)
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Shows Grade 10 subjects & exam preps
+                </p>
+              </button>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleDemoLogin('lerato@example.com', 'User123!')}
+                className="group flex flex-col items-start rounded-xl border border-sky-500/30 bg-sky-500/10 p-3.5 text-left transition hover:border-sky-400 hover:bg-sky-500/20 disabled:opacity-50"
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-500/20 px-2 py-0.5 text-[11px] font-bold text-sky-300">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    GRADE 11 LEARNER
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-sky-400 transition group-hover:translate-x-0.5" />
+                </div>
+                <p className="mt-2 text-xs font-semibold text-white">
+                  Lerato Ndlovu (Grade 11)
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Shows Grade 11 subjects & exam preps
+                </p>
+              </button>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleDemoLogin('sipho@example.com', 'User123!')}
+                className="group flex flex-col items-start rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-left transition hover:border-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-bold text-amber-300">
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    GRADE 12 MATRIC
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-amber-400 transition group-hover:translate-x-0.5" />
+                </div>
+                <p className="mt-2 text-xs font-semibold text-white">
+                  Sipho Dlamini (Grade 12)
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Shows Grade 12 Matric exam preps
+                </p>
               </button>
             </div>
           </div>
         </div>
 
         {/* Right column: Sign-in Card */}
-        <div className="lg:col-span-6">
+        <div className="lg:col-span-5">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 shadow-2xl">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-white">Sign in to your account</h2>
+              <h2 className="text-xl font-bold text-white">Sign In to MatricPrep</h2>
               <p className="mt-1 text-xs text-slate-400">
-                Enter your credentials or select one of the seeded demo accounts.
+                Sign in as a Learner (Grade 10–12) or Administrator.
               </p>
             </div>
 
@@ -153,8 +206,8 @@ export const LoginPage: React.FC = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    placeholder="learner@example.com"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
               </div>
@@ -166,7 +219,7 @@ export const LoginPage: React.FC = () => {
                   </label>
                   <Link
                     to="/forgot-password"
-                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+                    className="text-xs font-medium text-emerald-400 hover:text-emerald-300"
                   >
                     Forgot password?
                   </Link>
@@ -179,7 +232,7 @@ export const LoginPage: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                   <button
                     type="button"
@@ -198,7 +251,7 @@ export const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-500 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-500 disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -216,12 +269,12 @@ export const LoginPage: React.FC = () => {
 
             <div className="mt-6 border-t border-slate-800/80 pt-5 text-center">
               <p className="text-xs text-slate-400">
-                Don&apos;t have an account yet?{' '}
+                New learner?{' '}
                 <Link
                   to="/register"
-                  className="font-semibold text-indigo-400 hover:text-indigo-300"
+                  className="font-semibold text-emerald-400 hover:text-emerald-300"
                 >
-                  Create a new account
+                  Register for Grade 10, 11, or 12
                 </Link>
               </p>
             </div>

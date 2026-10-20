@@ -2,10 +2,10 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
-  User as UserIcon,
+  GraduationCap,
   LogOut,
   Code2,
-  LayoutDashboard,
+  BookOpenCheck,
   KeyRound,
   UserPlus,
   LogIn,
@@ -29,15 +29,15 @@ export const Navbar: React.FC = () => {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/20">
-              <ShieldCheck className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 text-white shadow-lg shadow-indigo-500/20">
+              <GraduationCap className="h-5 w-5" />
             </div>
             <div>
               <span className="text-base font-bold tracking-tight text-white">
-                Nexus<span className="text-indigo-400">RBAC</span>
+                Matric<span className="text-emerald-400">Prep</span>
               </span>
               <span className="hidden sm:inline-block ml-2 rounded-md border border-slate-800 bg-slate-900 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-                GraphQL + Prisma + PG
+                Grade 10–12 Exam Revision
               </span>
             </div>
           </Link>
@@ -48,13 +48,13 @@ export const Navbar: React.FC = () => {
                 <Link
                   to="/dashboard"
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                    isActive('/dashboard')
-                      ? 'bg-slate-800 text-white'
+                    isActive('/dashboard') || location.pathname.startsWith('/exam/')
+                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                       : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
                   }`}
                 >
-                  <LayoutDashboard className="h-4 w-4 text-emerald-400" />
-                  User Portal
+                  <BookOpenCheck className="h-4 w-4 text-emerald-400" />
+                  Learner Exam Prep (Grade {user.grade})
                 </Link>
 
                 {user.role === 'ADMIN' && (
@@ -67,7 +67,7 @@ export const Navbar: React.FC = () => {
                     }`}
                   >
                     <ShieldCheck className="h-4 w-4 text-indigo-400" />
-                    Admin Console
+                    Admin Progress & Papers
                   </Link>
                 )}
               </>
@@ -106,7 +106,7 @@ export const Navbar: React.FC = () => {
                           : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                       }`}
                     >
-                      {user.role}
+                      {user.role === 'ADMIN' ? 'ADMIN' : `LEARNER · GR ${user.grade}`}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400">{user.email}</p>
@@ -136,10 +136,10 @@ export const Navbar: React.FC = () => {
               </Link>
               <Link
                 to="/register"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500"
               >
                 <UserPlus className="h-3.5 w-3.5" />
-                Register
+                Register Learner
               </Link>
               <Link
                 to="/forgot-password"
@@ -163,11 +163,11 @@ export const Navbar: React.FC = () => {
           <Link
             to="/dashboard"
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium ${
-              isActive('/dashboard') ? 'bg-slate-800 text-white' : 'text-slate-400'
+              isActive('/dashboard') ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400'
             }`}
           >
-            <UserIcon className="h-3.5 w-3.5" />
-            User Portal
+            <BookOpenCheck className="h-3.5 w-3.5" />
+            Grade {user.grade} Prep
           </Link>
           {user.role === 'ADMIN' && (
             <Link

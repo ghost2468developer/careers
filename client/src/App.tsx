@@ -9,6 +9,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { UserDashboardPage } from './pages/UserDashboardPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { ExamPrepSessionPage } from './pages/ExamPrepSessionPage';
 import { ArchitecturePage } from './pages/ArchitecturePage';
 
 const RootRedirect: React.FC = () => {
@@ -36,6 +37,14 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <UserDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/exam/:paperId"
+                element={
+                  <ProtectedRoute>
+                    <ExamPrepSessionPage />
                   </ProtectedRoute>
                 }
               />

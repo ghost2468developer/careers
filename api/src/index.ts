@@ -25,6 +25,7 @@ async function bootstrap() {
         modules: [
           'src/components/auth/{schema.graphql.ts,resolvers.ts}',
           'src/components/user/{schema.graphql.ts,resolvers.ts}',
+          'src/components/exam/{schema.graphql.ts,resolvers.ts}',
           'src/components/admin/{schema.graphql.ts,resolvers.ts}',
         ],
         timestamp: new Date().toISOString(),

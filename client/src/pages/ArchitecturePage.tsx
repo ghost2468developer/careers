@@ -12,86 +12,88 @@ import { graphqlRequest } from '../lib/graphql';
 
 const MODULE_DOCS = [
   {
+    name: 'exam',
+    schemaPath: 'api/src/components/exam/schema.graphql.ts',
+    resolversPath: 'api/src/components/exam/resolvers.ts',
+    roleGuard: 'requireAuth(context) · Grade 10/11/12 Scoped',
+    operations: [
+      'Query.examPapersForGrade(grade, subject)',
+      'Query.examPaperById(id)',
+      'Query.myAcademicProgress(grade)',
+      'Query.myExamAttempts(grade, subject)',
+      'Mutation.checkSingleQuestion(questionId, studentAnswer)',
+      'Mutation.submitExamAttempt(input)',
+    ],
+  },
+  {
     name: 'admin',
     schemaPath: 'api/src/components/admin/schema.graphql.ts',
     resolversPath: 'api/src/components/admin/resolvers.ts',
     roleGuard: 'requireAdmin(context)',
     operations: [
       'Query.adminStats',
-      'Query.adminUsers(search, role, isActive)',
-      'Query.adminUser(id)',
-      'Query.adminResetTokens',
-      'Query.adminAuditLogs(limit)',
-      'Mutation.adminCreateUser(input)',
-      'Mutation.adminUpdateUserRole(userId, role)',
-      'Mutation.adminToggleUserStatus(userId, isActive)',
-      'Mutation.adminTriggerPasswordReset(userId)',
-      'Mutation.adminDeleteUser(userId)',
+      'Query.adminLearnerProgressList(grade, search)',
+      'Query.adminAllExamPapers(grade, subject)',
+      'Query.adminAllExamAttempts(grade, subject, userId)',
+      'Mutation.adminCreateExamPaper(input)',
+      'Mutation.adminReviewAttempt(attemptId, teacherFeedback, adjustedScore)',
+      'Mutation.adminUpdateLearnerGrade(userId, grade)',
+      'Mutation.adminCreateUser / adminUpdateUserRole / adminDeleteUser',
     ],
   },
   {
-    name: 'auth',
-    schemaPath: 'api/src/components/auth/schema.graphql.ts',
-    resolversPath: 'api/src/components/auth/resolvers.ts',
-    roleGuard: 'Public / JWT Context',
+    name: 'auth & user',
+    schemaPath: 'api/src/components/{auth,user}/schema.graphql.ts',
+    resolversPath: 'api/src/components/{auth,user}/resolvers.ts',
+    roleGuard: 'JWT + Role & Grade Context',
     operations: [
-      'Query.me',
-      'Query.verifyResetToken(token)',
-      'Mutation.register(input)',
-      'Mutation.login(input)',
-      'Mutation.forgotPassword(input)',
-      'Mutation.resetPassword(input)',
-    ],
-  },
-  {
-    name: 'user',
-    schemaPath: 'api/src/components/user/schema.graphql.ts',
-    resolversPath: 'api/src/components/user/resolvers.ts',
-    roleGuard: 'requireAuth(context)',
-    operations: [
-      'Query.myProfile',
-      'Query.myAuditLogs',
-      'Mutation.updateProfile(input)',
-      'Mutation.changePassword(input)',
+      'Mutation.register(input) [with Grade 10/11/12]',
+      'Mutation.login(input) / forgotPassword / resetPassword',
+      'Mutation.setLearnerGrade(grade)',
+      'Mutation.updateProfile(input) / changePassword(input)',
     ],
   },
 ];
 
 const SAMPLE_QUERIES: Record<string, string> = {
-  'Introspect Schema Types': `query IntrospectTypes {
-  __schema {
-    queryType { name }
-    mutationType { name }
-    types {
-      name
-      kind
-    }
-  }
-}`,
-  'Current User (me)': `query GetCurrentUser {
-  me {
+  'Grade 10 Exam Papers Only': `query GetGrade10Papers {
+  examPapersForGrade(grade: 10) {
     id
-    name
-    email
-    role
-    isActive
-    lastLoginAt
+    title
+    subject
+    grade
+    totalMarks
+    questionCount
   }
 }`,
-  'Admin Statistics (ADMIN role)': `query GetAdminStats {
+  'Grade 12 Matric Papers Only': `query GetGrade12Papers {
+  examPapersForGrade(grade: 12) {
+    id
+    title
+    subject
+    grade
+    totalMarks
+    questionCount
+  }
+}`,
+  'Admin Academic Stats (ADMIN role)': `query GetAdminAcademicStats {
   adminStats {
-    totalUsers
-    adminCount
     userCount
-    activeUsers
-    activeResetTokens
-    totalAuditEvents
+    grade10Learners
+    grade11Learners
+    grade12Learners
+    totalExamPapers
+    totalQuestions
+    totalExamAttempts
+    overallAveragePercentage
   }
 }`,
 };
 
 export const ArchitecturePage: React.FC = () => {
-  const [queryText, setQueryText] = useState(SAMPLE_QUERIES['Current User (me)']);
+  const [queryText, setQueryText] = useState(
+    SAMPLE_QUERIES['Grade 10 Exam Papers Only']
+  );
   const [responseJson, setResponseJson] = useState<string>(
     '// Click "Execute GraphQL Query" to run against /graphql'
   );
@@ -117,7 +119,6 @@ export const ArchitecturePage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-      {/* Header */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
         <div className="flex items-center gap-2.5 text-xs font-semibold text-sky-400">
           <Code2 className="h-4 w-4" />
@@ -127,14 +128,14 @@ export const ArchitecturePage: React.FC = () => {
           Component-Based GraphQL Schema & Resolvers
         </h1>
         <p className="mt-1 text-xs text-slate-400 max-w-3xl">
-          Every backend feature module lives under <code className="text-sky-300">api/src/components/&lt;feature&gt;/</code> with its own{' '}
-          <code className="text-emerald-300">schema.graphql.ts</code> and{' '}
+          Every backend feature module lives under{' '}
+          <code className="text-sky-300">api/src/components/&lt;feature&gt;/</code> with its
+          own <code className="text-emerald-300">schema.graphql.ts</code> and{' '}
           <code className="text-indigo-300">resolvers.ts</code>, merged automatically in{' '}
           <code className="text-amber-300">api/src/components/index.ts</code>.
         </p>
       </div>
 
-      {/* Component Modules Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
         {MODULE_DOCS.map((mod) => (
           <div
@@ -142,7 +143,7 @@ export const ArchitecturePage: React.FC = () => {
             className="flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-900/70 p-5"
           >
             <div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/15 px-2.5 py-1 font-mono text-xs font-bold text-indigo-300">
                   <FolderTree className="h-3.5 w-3.5" />
                   src/components/{mod.name}
@@ -168,7 +169,7 @@ export const ArchitecturePage: React.FC = () => {
                       key={op}
                       className="flex items-center gap-1.5 font-mono text-xs text-slate-300"
                     >
-                      <CheckCircle2 className="h-3 w-3 shrink-0 text-indigo-400" />
+                      <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
                       {op}
                     </li>
                   ))}
@@ -179,11 +180,10 @@ export const ArchitecturePage: React.FC = () => {
         ))}
       </div>
 
-      {/* Live GraphQL Playground */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
-            <Database className="h-5 w-5 text-indigo-400" />
+            <Database className="h-5 w-5 text-emerald-400" />
             <div>
               <h2 className="text-base font-bold text-white">
                 Interactive GraphQL Runner (/graphql)
@@ -200,7 +200,7 @@ export const ArchitecturePage: React.FC = () => {
                 key={label}
                 type="button"
                 onClick={() => setQueryText(SAMPLE_QUERIES[label])}
-                className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-300 hover:border-indigo-500/40 hover:text-white"
+                className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-300 hover:border-emerald-500/40 hover:text-white"
               >
                 {label}
               </button>
@@ -209,7 +209,7 @@ export const ArchitecturePage: React.FC = () => {
               type="button"
               onClick={handleRunQuery}
               disabled={running}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
             >
               {running ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -230,7 +230,7 @@ export const ArchitecturePage: React.FC = () => {
               rows={11}
               value={queryText}
               onChange={(e) => setQueryText(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs text-emerald-300 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs text-emerald-300 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 

@@ -79,6 +79,7 @@ export const authResolvers = {
           email: string;
           password: string;
           role?: Role;
+          grade?: number;
         };
       },
       context: GraphQLContext
@@ -87,6 +88,9 @@ export const authResolvers = {
       const email = args.input.email.trim().toLowerCase();
       const password = args.input.password;
       const role = args.input.role || Role.USER;
+      const grade = [10, 11, 12].includes(Number(args.input.grade))
+        ? Number(args.input.grade)
+        : 10;
 
       if (!name || name.length < 2) {
         throw new GraphQLError('Name must be at least 2 characters long.', {
@@ -124,6 +128,7 @@ export const authResolvers = {
           email,
           passwordHash,
           role,
+          grade,
           isActive: true,
           lastLoginAt: new Date(),
         },
@@ -132,7 +137,7 @@ export const authResolvers = {
       await context.prisma.auditLog.create({
         data: {
           action: 'USER_REGISTERED',
-          details: `Account registered for ${user.email} with role ${user.role}`,
+          details: `Learner/User registered: ${user.email} (Role: ${user.role}, Grade ${user.grade})`,
           userId: user.id,
         },
       });
@@ -187,7 +192,7 @@ export const authResolvers = {
       await context.prisma.auditLog.create({
         data: {
           action: 'USER_LOGIN',
-          details: `User ${updatedUser.email} (${updatedUser.role}) signed in`,
+          details: `User ${updatedUser.email} (${updatedUser.role}, Grade ${updatedUser.grade}) signed in`,
           userId: updatedUser.id,
         },
       });
@@ -217,7 +222,6 @@ export const authResolvers = {
         });
       }
 
-      // Invalidate previous unused reset tokens for this user
       await context.prisma.passwordResetToken.updateMany({
         where: {
           userId: user.id,
@@ -229,7 +233,7 @@ export const authResolvers = {
       });
 
       const tokenString = generateResetTokenString();
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
       await context.prisma.passwordResetToken.create({
         data: {

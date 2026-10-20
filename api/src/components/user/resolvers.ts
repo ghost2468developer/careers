@@ -43,7 +43,7 @@ export const userResolvers = {
   Mutation: {
     updateProfile: async (
       _parent: unknown,
-      args: { input: { name: string; avatarUrl?: string | null } },
+      args: { input: { name: string; grade?: number | null; avatarUrl?: string | null } },
       context: GraphQLContext
     ) => {
       const currentUser = requireAuth(context);
@@ -55,10 +55,16 @@ export const userResolvers = {
         });
       }
 
+      const nextGrade =
+        args.input.grade && [10, 11, 12].includes(args.input.grade)
+          ? args.input.grade
+          : currentUser.grade;
+
       const updated = await context.prisma.user.update({
         where: { id: currentUser.id },
         data: {
           name,
+          grade: nextGrade,
           avatarUrl: args.input.avatarUrl?.trim() || null,
         },
       });
@@ -66,7 +72,36 @@ export const userResolvers = {
       await context.prisma.auditLog.create({
         data: {
           action: 'PROFILE_UPDATED',
-          details: `User updated profile name to "${updated.name}"`,
+          details: `Learner updated profile (Name: "${updated.name}", Grade: ${updated.grade})`,
+          userId: currentUser.id,
+        },
+      });
+
+      return serializeUser(updated);
+    },
+
+    setLearnerGrade: async (
+      _parent: unknown,
+      args: { grade: number },
+      context: GraphQLContext
+    ) => {
+      const currentUser = requireAuth(context);
+
+      if (![10, 11, 12].includes(args.grade)) {
+        throw new GraphQLError('Grade must be 10, 11, or 12.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      const updated = await context.prisma.user.update({
+        where: { id: currentUser.id },
+        data: { grade: args.grade },
+      });
+
+      await context.prisma.auditLog.create({
+        data: {
+          action: 'GRADE_SWITCHED',
+          details: `Learner switched active revision level to Grade ${args.grade}`,
           userId: currentUser.id,
         },
       });

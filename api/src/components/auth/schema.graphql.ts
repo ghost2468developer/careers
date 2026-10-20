@@ -9,6 +9,7 @@ export const authTypeDefs = `#graphql
     email: String!
     name: String!
     role: Role!
+    grade: Int!
     isActive: Boolean!
     avatarUrl: String
     lastLoginAt: String
@@ -40,6 +41,7 @@ export const authTypeDefs = `#graphql
     email: String!
     password: String!
     role: Role
+    grade: Int
   }
 
   input LoginInput {

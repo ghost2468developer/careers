@@ -11,6 +11,7 @@ export const userTypeDefs = `#graphql
 
   input UpdateProfileInput {
     name: String!
+    grade: Int
     avatarUrl: String
   }
 
@@ -26,6 +27,7 @@ export const userTypeDefs = `#graphql
 
   extend type Mutation {
     updateProfile(input: UpdateProfileInput!): User!
+    setLearnerGrade(grade: Int!): User!
     changePassword(input: ChangePasswordInput!): Boolean!
   }
 `;
