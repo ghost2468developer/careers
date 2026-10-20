@@ -1,4 +1,4 @@
-# NexusRBAC — Full-Stack React + Node.js + TypeScript + GraphQL + Prisma + PostgreSQL
+# NexusRBAC - Full-Stack React + Node.js + TypeScript + GraphQL + Prisma + PostgreSQL
 
 ## Tech Stack
 - **Frontend (`client/`)**: React 18, TypeScript, Vite, Tailwind CSS, React Router v6
